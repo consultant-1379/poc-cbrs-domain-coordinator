@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "eric-cnom-server.fullname" . }}
+  labels:
+    {{- include "eric-cnom-server.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-cnom-server.product-info" . | nindent 4 }}
+    {{- if .Values.annotations }}
+    {{- .Values.annotations | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- if .Values.global }}
+  {{- if .Values.global.internalIPFamily }}
+  ipFamilies:
+    - {{ .Values.global.internalIPFamily }}
+  {{- end }}
+  {{- end }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "eric-cnom-server.selectorLabels" . | nindent 4 }}

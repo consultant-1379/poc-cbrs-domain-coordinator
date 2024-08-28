@@ -1,0 +1,122 @@
+# Default values for log.
+# This is a YAML-formatted file.
+
+#global:
+#  registry:
+#    imagePullPolicy: "IfNotPresent"
+#    url: "armdocker.rnd.ericsson.se"
+#  pullSecret:
+#  timezone: "UTC"
+#  security:
+#    tls:
+#      enabled: true
+#  nodeSelector: {}
+#  security:
+#    policyBinding:
+#      create: false
+#    policyReferenceMap:
+#      default-restricted-security-policy: "default-restricted-security-policy"
+
+imageCredentials:
+  repoPath: "proj-adp-log-released"
+  registry:
+    imagePullPolicy: # When set this overrides global image pull policy
+    url:
+  pullSecret: # When set this overrides global pull secret
+  logshipper:
+    registry:
+      url:
+      pullPolicy:
+
+images:
+  curator:
+    name: "eric-data-search-engine-curator"
+    tag: "2.4.0-15"
+  logshipper:
+    name: "eric-log-shipper"
+    tag: "5.3.0-14"
+
+cronjob:
+  curator:
+    enabled: true
+    schedule: "* * * * *"
+    successfulJobHistoryLimit: 3
+    failedJobHistoryLimit: 5
+
+resources:
+  curator:
+    requests:
+      memory: "100Mi"
+      cpu: "100m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
+  logshipper:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
+
+dryRun: false
+
+logLevel: "info"
+
+log:
+  outputs:
+    - "stdout"
+  logshipper:
+    level: "info"
+
+livenessProbe:
+  logshipper:
+    initialDelaySeconds: 300
+    timeoutSeconds: 15
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 3
+
+readinessProbe:
+  logshipper:
+    initialDelaySeconds: 30
+    timeoutSeconds: 15
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 3
+
+logshipper:
+  logplane: "adp-app-logs"
+  storageAllocation: "50Mi"
+  runAndExit: true
+  harvester:
+    logData:
+      - subPaths:
+        - "/curator.log*"
+        logplane:
+  logtransformer:
+    host: eric-log-transformer
+
+searchengine:
+  host: "eric-data-search-engine"
+  port: 9200
+
+actions: |
+  1:
+    action: delete_indices
+    description: Remove logs older than 1 week
+    options:
+      disable_action: true
+      ignore_empty_list: true
+    filters:
+    - filtertype: age
+      source: name
+      direction: older
+      timestring: '%Y.%m.%d'
+      unit: days
+      unit_count: 7
+
+labels: {}
+annotations: {}
+
+clusterDomain: "cluster.local"

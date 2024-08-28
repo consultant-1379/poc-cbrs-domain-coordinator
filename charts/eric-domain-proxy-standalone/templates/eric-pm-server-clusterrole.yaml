@@ -1,0 +1,46 @@
+{{ if or (index .Values "tags" "eric-pm-server") (index .Values "tags" "eric-dp-common") }}
+{{- if not (index .Values "eric-pm-server" "rbac" "appMonitoring" "enabled") }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+  name: {{ template "eric-domain-proxy-standalone.pm-server.clusterrole.name" . }}
+  labels:
+{{- include "eric-domain-proxy-standalone.labels" . | indent 4 }}
+  annotations:
+{{- include "eric-domain-proxy-standalone.product-info" . | indent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+  - apiGroups:
+      - "extensions"
+    resources:
+      - ingresses/status
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - nonResourceURLs:
+      - "/metrics"
+    verbs:
+      - get
+{{- end }}
+{{- end }}

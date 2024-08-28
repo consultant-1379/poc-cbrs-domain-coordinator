@@ -1,0 +1,230 @@
+{{- define "eric-data-search-engine.labels"}}
+app.kubernetes.io/name: {{ include "eric-data-search-engine.name" . | quote }}
+app.kubernetes.io/version: {{ include "eric-data-search-engine.version" . | quote }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- if .Values.labels }}
+{{ toYaml .Values.labels }}
+{{- end }}
+{{- end }}
+
+{{- define "eric-data-search-engine.helm-labels" }}
+{{- $chartver := .Chart.Version | replace "+" "_" }}
+labels:
+  {{- include "eric-data-search-engine.labels" . | indent 2 }}
+  release: {{ .Release.Name }}
+  heritage: {{ .Release.Service }}
+  chart: {{ include "eric-data-search-engine.chart" . | quote }}
+{{- end }}
+
+{{- define "eric-data-search-engine.annotations" }}
+ericsson.com/product-name: "Search Engine"
+ericsson.com/product-number: "CXC 201 1191"
+ericsson.com/product-revision: {{ (split "-" (.Chart.Version | replace "+" "-" ))._0 | quote }}
+{{- if .Values.annotations }}
+{{ toYaml .Values.annotations }}
+{{- end }}
+{{- end }}
+{{- define "eric-data-search-engine.deployment-init-containers" -}}
+- name: sysctl
+  image: {{ include "eric-data-search-engine.image-registry-url" . | quote }}
+  command: ["sysctl", "-w", "vm.max_map_count=262144"]
+  securityContext:
+    allowPrivilegeEscalation: true
+    privileged: true
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    runAsUser: 0
+    capabilities:
+      drop:
+        - all
+{{- end -}}
+
+{{- define "eric-data-search-engine.deployment-containers" }}
+{{- $g := fromJson (include "eric-data-search-engine.global" .root ) }}
+image: {{ include "eric-data-search-engine.image-registry-url" .root | quote }}
+imagePullPolicy: {{ .root.Values.imageCredentials.registry.imagePullPolicy | default $g.registry.imagePullPolicy | quote }}
+command:
+  - /opt/redirect/stdout-redirect
+  - -redirect
+  - {{ include "eric-data-search-engine.log-redirect" .root }}
+  - -run
+  - /init.sh
+  {{- if has "stream" .root.Values.log.outputs }}
+  - -logfile
+  - {{ .root.Values.logshipper.storagePath }}/searchengine.log
+  - -size
+  - "5"
+  {{- end }}
+securityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - "all"
+volumeMounts:
+  {{- if not (contains "ingest" .context.pod) }}
+- name: storage
+  mountPath: /opt/elasticsearch/data
+    {{- if and .root.Values.brAgent.enabled (eq .root.Values.brAgent.backupRepository.type "fs") }}
+- name: repository
+  mountPath: /opt/elasticsearch/repository
+    {{- end }}
+  {{- end }}
+- name: config
+  mountPath: "/etc/elasticsearch/elasticsearch.yml"
+  subPath: "elasticsearch.yml"
+- name: config
+  mountPath: "/etc/elasticsearch/log4j2.properties"
+  subPath: "log4j2.properties"
+- name: config
+  mountPath: "/etc/elasticsearch/jvm.options"
+  subPath: "jvm.options"
+- name: "config"
+  mountPath: "/etc/elasticsearch/template.json"
+  subPath: "template.json"
+- name: "config"
+  mountPath: "/etc/elasticsearch/settings.json"
+  subPath: "settings.json"
+  {{- if and .root.Values.brAgent.enabled (eq .root.Values.brAgent.backupRepository.type "s3") }}
+- name: s3secrets
+  mountPath: "/run/secrets/s3"
+  readOnly: true
+  {{- end }}
+  {{- if $g.security.tls.enabled }}
+    {{- include "eric-data-search-engine.security-tls-secret-volume-mounts-transport" . }}
+    {{- if .context.tls }}
+      {{- include "eric-data-search-engine.security-tls-secret-volume-mounts-http-server" . }}
+    {{- end }}
+  {{- end }}
+{{- if has "stream" .root.Values.log.outputs }}
+  {{- include "eric-data-search-engine.logshipper-storage-path" .root }}
+{{- end }}
+{{- end }}
+
+{{- define "eric-data-search-engine.pullSecrets" }}
+{{- $g := fromJson (include "eric-data-search-engine.global" .) }}
+{{- if or .Values.imageCredentials.pullSecret $g.pullSecret }}
+imagePullSecrets:
+  - name: {{ or .Values.imageCredentials.pullSecret $g.pullSecret | quote }}
+{{- end }}
+{{- end }}
+
+{{- define "eric-data-search-engine.deployment-env" }}
+{{- $g := fromJson (include "eric-data-search-engine.global" .root ) }}
+- name: NAMESPACE
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.namespace
+- name: NODE_NAME
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+- name: ES_PATH_CONF
+  value: /etc/elasticsearch
+- name: ES_ENV_CN
+  value: cluster.name={{ include "eric-data-search-engine.fullname" .root | quote }}
+- name: ES_ENV_NN
+  value: node.name=$(NODE_NAME)
+- name: ES_ENV_BM
+  value: bootstrap.memory_lock=false
+- name: ES_LOG4J2_ROOTLOGGER_LEVEL
+  value: {{ .root.Values.debugLevel | default "info" | quote }}
+- name: TZ
+  value: {{ $g.timezone | quote }}
+{{- if eq .root.Values.brAgent.backupRepository.type "s3" }}
+- name: REPOTYPE
+  value: s3
+{{- end }}
+- name: "ES_PORT"
+  value: {{ .root.Values.ingest.httpPort | quote }}
+- name: "ES_INTERNODE_TLS"
+{{- if $g.security.tls.enabled }}
+  value: "true"
+{{- else }}
+  value: "false"
+{{- end }}
+- name: "ES_REST_TLS"
+{{- if and $g.security.tls.enabled (eq .context "tls") }}
+  value: "true"
+{{- else }}
+  value: "false"
+{{- end }}
+{{- end }}
+
+{{- define "eric-data-search-engine.configmap-volume" }}
+{{- $g := fromJson (include "eric-data-search-engine.global" .root ) }}
+- name: config
+  configMap:
+    {{- if .context.tls }}
+    name: {{ include "eric-data-search-engine.fullname" .root }}-cfg
+    {{- else }}
+    {{- if $g.security.tls.enabled }}
+    name: {{ include "eric-data-search-engine.fullname" .root }}-cfg-ingest-notls
+    {{- else }}
+    name: {{ include "eric-data-search-engine.fullname" .root }}-cfg
+    {{- end }}
+    {{- end }}
+    items:
+      - key: elasticsearch.yml
+        path: elasticsearch.yml
+      - key: log4j2.properties
+        path: log4j2.properties
+      - key: jvm.options
+        path: jvm.options
+      - key: "template.json"
+        path: "template.json"
+      - key: "settings.json"
+        path: "settings.json"
+{{- end }}
+
+{{- define "eric-data-search-engine.repository-volume" }}
+{{ if and .Values.brAgent.enabled (eq .Values.brAgent.backupRepository.type "fs") }}
+- name: repository
+  persistentVolumeClaim:
+    claimName: {{ include "eric-data-search-engine.fullname" . }}-repository
+{{- end }}
+{{- end }}
+
+{{- define "eric-data-search-engine.deployment-volume-empty" }}
+{{- $g := fromJson (include "eric-data-search-engine.global" .root ) -}}
+volumes:
+  {{- if and .root.Values.brAgent.enabled (eq .root.Values.brAgent.backupRepository.type "s3") }}
+  - emptyDir:
+      medium: ""
+    name: s3secrets
+  {{- end }}
+  {{ include "eric-data-search-engine.configmap-volume" . | indent 2 }}
+  {{- if $g.security.tls.enabled }}
+    {{- include "eric-data-search-engine.security-tls-secret-volumes-transport" .root | indent 2 }}
+    {{- if .root.Values.metrics.enabled }}
+      {{- include "eric-data-search-engine.security-tls-secret-volumes-metrics-client" .root | indent 2 }}
+      {{- include "eric-data-search-engine.security-tls-secret-volumes-metrics-server" .root | indent 2 }}
+    {{- end }}
+    {{- if .context.tls }}
+      {{- include "eric-data-search-engine.security-tls-secret-volumes-http-server" .root | indent 2 }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- define "eric-data-search-engine.service-network-protocol" -}}
+{{- $g := fromJson (include "eric-data-search-engine.global" .) }}
+{{- if or .Values.service.network.protocol.IPv6 (eq $g.internalIPFamily "IPv6") -}}
+publish_host: "_global_"
+bind_host: "0"
+{{- else -}}
+host: 0.0.0.0
+{{- end -}}
+{{- end -}}
+
+{{- define "eric-data-search-engine.secret-volume" }}
+- name: s3secrets
+  secret:
+    secretName: {{ required "brAgent.backupRepository.s3.secretName is required when brAgent.backupRepository.type=s3" .Values.brAgent.backupRepository.s3.secretName | quote }}
+    items:
+      - key: {{ required "brAgent.backupRepository.s3.userKey is required when brAgent.backupRepository.type=s3" .Values.brAgent.backupRepository.s3.userKey | quote }}
+        path: username
+      - key: {{ required "brAgent.backupRepository.s3.passKey is required when brAgent.backupRepository.type=s3" .Values.brAgent.backupRepository.s3.passKey | quote }}
+        path: password
+{{- end }}

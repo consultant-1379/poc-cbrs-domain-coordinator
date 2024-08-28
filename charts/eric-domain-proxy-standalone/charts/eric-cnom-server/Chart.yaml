@@ -1,0 +1,5 @@
+apiVersion: v2
+appVersion: ha246f63f3
+description: Core Network Operations Manager - O&M web GUI
+name: eric-cnom-server
+version: 1.62.2+6

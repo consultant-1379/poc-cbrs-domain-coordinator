@@ -1,0 +1,71 @@
+{{- define "eric-enm-common-helmchart-library.statefulset.tpl" -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+{{ include "eric-enm-common-helmchart-library.metadata-stateful" . | indent 2 }}
+spec:
+  serviceName: {{ .Values.service.name }}
+  replicas: {{ template "eric-enm-common-helmchart-library.replicas" . }}
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+{{- if .Values.updateStrategy }}
+  updateStrategy:
+    type: {{ .Values.updateStrategy.type }}
+  {{- if .Values.updateStrategy.rollingUpdate }}
+    rollingUpdate:
+      partition: {{ .Values.updateStrategy.rollingUpdate.partition }}
+  {{- end }}
+{{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+        app.kubernetes.io/name: {{ .Values.service.name | quote }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+{{- with .Values.podAnnotations }}
+      annotations:
+{{- include "eric-enmsg-jmsserver.product-info" . | indent 8 }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+{{- if .Values.priorityClassName }}
+      priorityClassName: "{{ .Values.priorityClassName }}"
+{{- end }}
+{{- if .Values.affinity }}
+      affinity:
+{{ tpl .Values.affinity . | indent 8 }}
+{{- end }}
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}
+{{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+{{- end }}
+{{ include "eric-enm-common-helmchart-library.container.tpl" . | indent 6 }}
+{{- if include "eric-enm-common-helmchart-library.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-enm-common-helmchart-library.pullSecrets" . }}
+{{- end }}
+{{- if .Files.Glob "appconfig/volumes.yaml" }}
+      volumes:
+{{ tpl (.Files.Get "appconfig/volumes.yaml") . | indent 6 }}
+{{- end }}
+{{- if .Values.persistentVolumeClaim.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: pv-{{ template "eric-enm-common-helmchart-library.name" . }}
+      spec:
+        accessModes:
+          - {{ .Values.persistentVolumeClaim.accessMode | quote }}
+        storageClassName: {{ template "eric-enm-common-helmchart-library.storageClass" . }}
+        resources:
+          requests:
+            storage: {{ template "eric-enm-common-helmchart-library.PVSize" . }}
+{{- end }}
+{{- end -}}
+{{- define "eric-enm-common-helmchart-library.statefulset" -}}
+{{- template "eric-enm-common-helmchart-library.util.merge" (append . "eric-enm-common-helmchart-library.statefulset.tpl") -}}
+{{- end -}}

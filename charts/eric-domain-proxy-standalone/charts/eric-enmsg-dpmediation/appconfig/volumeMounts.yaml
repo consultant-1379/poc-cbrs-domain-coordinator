@@ -1,0 +1,8 @@
+- name: gp
+  mountPath: /gp
+- name: gp
+  mountPath: /ericsson/tor/data/global.properties
+  subPath: global.properties
+- name: key
+  mountPath: /ericsson/tor/data/idenmgmt/postgresql01_passkey
+  subPath: postgresql01_passkey

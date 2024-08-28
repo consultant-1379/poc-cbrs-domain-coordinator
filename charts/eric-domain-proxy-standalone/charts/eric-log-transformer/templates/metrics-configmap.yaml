@@ -1,0 +1,14 @@
+{{ if .Values.metrics.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . }}-metrics-exporter-cfg
+  labels:
+{{- include "eric-log-transformer.labels" . | indent 4 }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+data:
+  application.properties: |
+    logstash.port= {{ .Values.service.portApi }}
+    logstash.metricsPort= 9114
+{{ end }}

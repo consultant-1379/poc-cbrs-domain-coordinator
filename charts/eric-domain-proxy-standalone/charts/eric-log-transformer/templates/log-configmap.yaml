@@ -1,0 +1,761 @@
+{{- $g := fromJson (include "eric-log-transformer.global" .) -}}
+{{- $d := fromJson (include "eric-log-transformer.deprecated" .) -}}
+{{- $syslogOutput := fromJson (include "eric-log-transformer.syslog-output-config" .) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . }}-cfg
+  labels:
+{{- include "eric-log-transformer.labels" . | indent 4 }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+data:
+  log4j2.properties: |
+    status = error
+    name = LogstashPropertiesConfig
+
+    appender.console.type = Console
+    appender.console.name = plain_console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = [%d{YYYY-MM-dd'T'HH:mm:ss.sssXXX}][%-5p][%-25c] %m%n
+
+    appender.json_console.type = Console
+    appender.json_console.name = json_console
+    appender.json_console.layout.type = JSONLayout
+    appender.json_console.layout.compact = true
+    appender.json_console.layout.eventEol = true
+
+    appender.rolling.type = RollingFile
+    appender.rolling.name = plain_rolling
+    appender.rolling.fileName = ${sys:ls.logs}/logstash-${sys:ls.log.format}.log
+    appender.rolling.filePattern = ${sys:ls.logs}/logstash-${sys:ls.log.format}-%d{yyyy-MM-dd}-%i.log.gz
+    appender.rolling.policies.type = Policies
+    appender.rolling.policies.time.type = TimeBasedTriggeringPolicy
+    appender.rolling.policies.time.interval = 1
+    appender.rolling.policies.time.modulate = true
+    appender.rolling.layout.type = PatternLayout
+    appender.rolling.layout.pattern = [%d{YYYY-MM-dd'T'HH:mm:ss.sssXXX}][%-5p][%-25c] %-.10000m%n
+    appender.rolling.policies.size.type = SizeBasedTriggeringPolicy
+    appender.rolling.policies.size.size = 100MB
+
+    appender.json_rolling.type = RollingFile
+    appender.json_rolling.name = json_rolling
+    appender.json_rolling.fileName = ${sys:ls.logs}/logstash-${sys:ls.log.format}.log
+    appender.json_rolling.filePattern = ${sys:ls.logs}/logstash-${sys:ls.log.format}-%d{yyyy-MM-dd}-%i.log.gz
+    appender.json_rolling.policies.type = Policies
+    appender.json_rolling.policies.time.type = TimeBasedTriggeringPolicy
+    appender.json_rolling.policies.time.interval = 1
+    appender.json_rolling.policies.time.modulate = true
+    appender.json_rolling.layout.type = JSONLayout
+    appender.json_rolling.layout.compact = true
+    appender.json_rolling.layout.eventEol = true
+    appender.json_rolling.policies.size.type = SizeBasedTriggeringPolicy
+    appender.json_rolling.policies.size.size = 100MB
+
+
+    rootLogger.level = ${sys:ls.log.level}
+    rootLogger.appenderRef.console.ref = ${sys:ls.log.format}_console
+    rootLogger.appenderRef.rolling.ref = ${sys:ls.log.format}_rolling
+
+
+
+    appender.console_slowlog.type = Console
+    appender.console_slowlog.name = plain_console_slowlog
+    appender.console_slowlog.layout.type = PatternLayout
+    appender.console_slowlog.layout.pattern = [%d{YYYY-MM-dd'T'HH:mm:ss.sssXXX}][%-5p][%-25c] %m%n
+
+    appender.json_console_slowlog.type = Console
+    appender.json_console_slowlog.name = json_console_slowlog
+    appender.json_console_slowlog.layout.type = JSONLayout
+    appender.json_console_slowlog.layout.compact = true
+    appender.json_console_slowlog.layout.eventEol = true
+
+    appender.rolling_slowlog.type = RollingFile
+    appender.rolling_slowlog.name = plain_rolling_slowlog
+    appender.rolling_slowlog.fileName = ${sys:ls.logs}/logstash-slowlog-${sys:ls.log.format}.log
+    appender.rolling_slowlog.filePattern = ${sys:ls.logs}/logstash-slowlog-${sys:ls.log.format}-%d{yyyy-MM-dd}-%i.log.gz
+    appender.rolling_slowlog.policies.type = Policies
+    appender.rolling_slowlog.policies.time.type = TimeBasedTriggeringPolicy
+    appender.rolling_slowlog.policies.time.interval = 1
+    appender.rolling_slowlog.policies.time.modulate = true
+    appender.rolling_slowlog.layout.type = PatternLayout
+    appender.rolling_slowlog.layout.pattern = [%d{YYYY-MM-dd'T'HH:mm:ss.sssXXX}][%-5p][%-25c] %.10000m%n
+    appender.rolling_slowlog.policies.size.type = SizeBasedTriggeringPolicy
+    appender.rolling_slowlog.policies.size.size = 100MB
+
+    appender.json_rolling_slowlog.type = RollingFile
+    appender.json_rolling_slowlog.name = json_rolling_slowlog
+    appender.json_rolling_slowlog.fileName = ${sys:ls.logs}/logstash-slowlog-${sys:ls.log.format}.log
+    appender.json_rolling_slowlog.filePattern = ${sys:ls.logs}/logstash-slowlog-${sys:ls.log.format}-%d{yyyy-MM-dd}-%i.log.gz
+    appender.json_rolling_slowlog.policies.type = Policies
+    appender.json_rolling_slowlog.policies.time.type = TimeBasedTriggeringPolicy
+    appender.json_rolling_slowlog.policies.time.interval = 1
+    appender.json_rolling_slowlog.policies.time.modulate = true
+    appender.json_rolling_slowlog.layout.type = JSONLayout
+    appender.json_rolling_slowlog.layout.compact = true
+    appender.json_rolling_slowlog.layout.eventEol = true
+    appender.json_rolling_slowlog.policies.size.type = SizeBasedTriggeringPolicy
+    appender.json_rolling_slowlog.policies.size.size = 100MB
+
+    logger.slowlog.name = slowlog
+    logger.slowlog.level = trace
+    logger.slowlog.appenderRef.console_slowlog.ref = ${sys:ls.log.format}_console_slowlog
+    logger.slowlog.appenderRef.rolling_slowlog.ref = ${sys:ls.log.format}_rolling_slowlog
+    logger.slowlog.additivity = false
+
+    logger.licensereader.name = logstash.licensechecker.licensereader
+    logger.licensereader.level = error
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    http.port: 9600
+    log.level: {{ .Values.logLevel | quote | default "error" | lower }}
+    pipeline.workers: 2
+    pipeline.batch.size: 2048
+    pipeline.batch.delay: 50
+  logstash.conf: |
+    # Don't remove below comment, this is used for certificate reload
+    # CERT_HASH="%%CERT_HASH%%"
+    input {
+      {{- if or (or (not $g.security.tls.enabled) (eq .Values.service.endpoints.filebeat.tls.enforced "optional")) (or $d.security.tls.logshipper.enabled $d.security.tls.eda) }}
+      beats {
+        id => "filebeat_cleartext"
+        port => 5045
+        type => filebeat
+        {{- if or $d.security.tls.logshipper.enabled $d.security.tls.eda }}
+        {{- include "eric-log-transformer.beats-tls-config-options" . | indent 8 }}
+        {{- end }}
+      }
+      {{- end }}
+      {{- if $g.security.tls.enabled }}
+      beats {
+        id => "filebeat_tls"
+        port => 5044
+        type => filebeat
+        ssl_certificate => "/run/secrets/input-cert/srvcert.pem"
+        ssl_key => "/run/secrets/input-cert/srvprivkey.pem"
+        ssl_certificate_authorities => ["/run/secrets/filebeat-ca-certificates/client-cacertbundle.pem", "/run/secrets/input-ca-cert/client-cacertbundle.pem"]
+        ssl => true
+        client_inactivity_timeout => 60
+        ssl_handshake_timeout => 10000
+        ssl_verify_mode => "force_peer"
+        tls_max_version => "1.2"
+        tls_min_version => "1.2"
+      }
+      tcp {
+        id => "syslog_tls"
+        port => 5015
+        type => syslog
+        add_field => [ "logplane", {{ .Values.syslog.syslogLogplane | quote }} ]
+        ssl_enable => true
+        ssl_cert => "/run/secrets/input-cert/srvcert.pem"
+        ssl_key => "/run/secrets/input-cert/srvprivkey.pem"
+        ssl_certificate_authorities => ["/run/secrets/syslog-input-ca-certs/client-cacertbundle.pem", "/run/secrets/input-ca-cert/client-cacertbundle.pem"]
+        ssl_verify => true
+      }
+      tcp {
+        id => "json_tls"
+        port => 5024
+        codec => json
+        type => "json-tcp"
+        add_field => [ "logplane", {{ .Values.json.logplane | quote }} ]
+        ssl_enable => true
+        ssl_cert => "/run/secrets/input-cert/srvcert.pem"
+        ssl_key => "/run/secrets/input-cert/srvprivkey.pem"
+        ssl_certificate_authorities => ["/run/secrets/input-ca-cert/client-cacertbundle.pem"]
+        ssl_verify => true
+      }
+      {{- end }}
+      {{- if or (not $g.security.tls.enabled) (eq .Values.service.endpoints.syslogIn.tls.enforced "optional") }}
+      tcp {
+        id => "syslog_txt"
+        port => 5014
+        type => syslog
+        add_field => [ "logplane", {{ .Values.syslog.syslogLogplane | quote }} ]
+      }
+      udp {
+        id => "syslog_udp"
+        port => 5014
+        type => syslog
+        add_field => [ "logplane", {{ .Values.syslog.syslogLogplane | quote }} ]
+      }
+      {{- end }}
+      {{- if or (not $g.security.tls.enabled) (eq .Values.service.endpoints.jsonIn.tls.enforced "optional") }}
+      tcp {
+        id => "json_txt"
+        port => 5025
+        codec => json
+        type => "json-tcp"
+        add_field => [ "logplane", {{ .Values.json.logplane | quote }} ]
+      }
+      {{- end }}
+      http {
+        port => 8080
+        type => readiness
+      }
+{{- if .Values.input }}
+{{- if .Values.input.tcp }}
+{{- if .Values.input.tcp.enable }}
+      tcp {
+        port => 5018
+        type => "json-tcp"
+        codec => json
+{{- include "eric-log-transformer.tcp-eda-tls-config-options" . | indent 8 }}
+      }
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.config.input }}
+{{ .Values.config.input | indent 6 }}
+{{- end }}
+    }
+
+    filter {
+      if [type] == "readiness" {
+        drop {}
+      }
+      else if [type] == "filebeat" {
+        {{- include "eric-log-transformer.logstash-config.filebeat-input-filter" . | nindent 8 }}
+        {{- include "eric-log-transformer.logstash-config.adp-json" . | nindent 8 }}
+      }
+      else if [type] == "json-tcp" {
+        {{- include "eric-log-transformer.logstash-config.json-validation" . | nindent 8 }}
+        {{- if .Values.config.adpJson.transformation.enabled }}
+          {{- include "eric-log-transformer.logstash-config.json-transformation" . | nindent 8 }}
+        {{- end }}
+      }
+      else if [type] == "syslog" {
+        grok {
+          break_on_match => true
+          match => [
+            "message", "%{SYSLOG5424LINE}",
+            "message", "%{SYSLOGLINE}"
+          ]
+        }
+
+        if [syslog5424_ts] {
+          # Handle RFC5424 formatted Syslog messages
+          mutate {
+            remove_field => [ "host" ]
+            add_tag => [ "syslog5424" ]
+          }
+          mutate {
+            # Use a friendlier naming scheme
+            rename => {
+              "syslog5424_app"  => "service_id"
+              "syslog5424_host" => "[kubernetes][node][name]"
+              "syslog5424_proc" => "[metadata][proc_id]"
+              "syslog5424_msgid" => "[metadata][category]"
+            }
+            remove_field => [ "syslog5424_ver" ]
+          }
+          if [syslog5424_pri] {
+            # Calculate facility and severity from the syslog PRI value
+            ruby {
+              code => "
+              facility = [
+                'kernel',
+                'user-level',
+                'mail',
+                'daemon',
+                'security/authorization',
+                'syslogd',
+                'line printer',
+                'network news',
+                'uucp',
+                'clock',
+                'security/authorization',
+                'ftp',
+                'ntp',
+                'log audit',
+                'log alert',
+                'clock',
+                'local0',
+                'local1',
+                'local2',
+                'local3',
+                'local4',
+                'local5',
+                'local6',
+                'local7'
+              ]
+              severity = [
+                'emergency',
+                'alert',
+                'critical',
+                'error',
+                'warning',
+                'notice',
+                'informational',
+                'debug'
+              ]
+              event.set('facility', facility[(event.get('syslog5424_pri').to_i / 8).floor])
+              event.set('severity', severity[event.get('syslog5424_pri').to_i.modulo(8)])"
+            }
+            mutate {
+              remove_field => [ "syslog5424_pri" ]
+            }
+          }
+          if [syslog5424_sd] {
+            # Handling Structured data
+            ruby {
+              code => '
+                def extract_structured_data(syslog5424_sd)
+                  sd = {}
+                  syslog5424_sd.scan(/\[(?<element>.*?[^\\])\]/) do |element|
+                    data = element[0].match(/(?<sd_id>[^\ ]+)(?<sd_params> .*)?/)
+                    sd_id = data[:sd_id].split("@", 2)[0]
+                    sd[sd_id] = {}
+                    next if data.nil? || data[:sd_params].nil?
+                    data[:sd_params].scan(/ (.*?[=](?:""|".*?[^\\]"))/) do |fields|
+                      fields = fields[0].match(/(?<param_name>.*?)[=]\"(?<param_value>.*)\"/)
+                      sd[sd_id][fields[:param_name]] = fields[:param_value]
+                    end
+                  end
+                  sd.delete("timeQuality")
+                  sd
+                end
+                event.set("[sd]", extract_structured_data(event.get("[message]")))
+              '
+              remove_field => "syslog5424_sd"
+            }
+            mutate {
+              rename => {
+                # move structured data under metadata
+                "sd"  => "[metadata][structured_data]"
+              }
+              remove_field => [ "sd" ]
+            }
+          }
+          date {
+            match => [ "syslog5424_ts", "ISO8601" ]
+            target => "timestamp"
+            remove_field => [ "syslog5424_ts" ]
+          }
+          mutate {
+              rename => {
+                "syslog5424_msg"  => "message"
+              }
+              remove_field => [ "syslog5424_msg" ]
+          }
+        }
+        else {
+          # Handle RFC3164 formatted Syslog messages
+          grok {
+            break_on_match => true
+            match => [
+              "message", "<%{POSINT:syslog_pri}>%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:syslog_source} %{PROG:syslog_program}(?:\[%{POSINT:syslog_pid}\])?: %{GREEDYDATA:syslog_msg}",
+              "message", "<%{POSINT:syslog_pri}>%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:syslog_source}: %{GREEDYDATA:syslog_msg}",
+              "message", "<%{POSINT:syslog_pri}>%{TIMESTAMP_ISO8601:timestamp} %{SYSLOGHOST:syslog_source} %{PROG:syslog_program}(?:\[%{POSINT:syslog_pid}\])?: %{GREEDYDATA:syslog_msg}",
+              "message", "<%{POSINT:syslog_pri}>%{TIMESTAMP_ISO8601:timestamp} %{SYSLOGHOST:syslog_source}: %{GREEDYDATA:syslog_msg}",
+              "message", "<%{POSINT:syslog_pri}>%{SYSLOGTIMESTAMP:timestamp}.*$",
+              "message", "<%{POSINT:syslog_pri}>%{TIMESTAMP_ISO8601:timestamp}.*$",
+              "message", "<%{POSINT:syslog_pri}>.*$",
+              "message", "%{SYSLOGTIMESTAMP:timestamp} %{GREEDYDATA:syslog_msg}",
+              "message", "%{TIMESTAMP_ISO8601:timestamp} %{GREEDYDATA:syslog_msg}",
+              "message", ".*$"
+            ]
+            overwrite => [ "timestamp", "syslog_msg" ]
+
+            add_tag => [ "syslog3164" ]
+            tag_on_failure => [""]
+          }
+          if [syslog_pri] {
+            # Calculate facility and severity from the syslog PRI value
+            ruby {
+              code => "
+              facility = [
+                'kernel',
+                'user-level',
+                'mail',
+                'daemon',
+                'security/authorization',
+                'syslogd',
+                'line printer',
+                'network news',
+                'uucp',
+                'clock',
+                'security/authorization',
+                'ftp',
+                'ntp',
+                'log audit',
+                'log alert',
+                'clock',
+                'local0',
+                'local1',
+                'local2',
+                'local3',
+                'local4',
+                'local5',
+                'local6',
+                'local7'
+              ]
+              severity = [
+                'emergency',
+                'alert',
+                'critical',
+                'error',
+                'warning',
+                'notice',
+                'informational',
+                'debug'
+              ]
+              event.set('facility', facility[(event.get('syslog_pri').to_i / 8).floor])
+              event.set('severity', severity[event.get('syslog_pri').to_i.modulo(8)])"
+            }
+            mutate {
+              remove_field => [ "syslog_pri" ]
+            }
+          }
+          mutate {
+            remove_field => [ "message", "host" ]
+          }
+          mutate {
+            rename => {
+              # Use a friendlier naming scheme
+              "syslog_program"  => "service_id"
+              "syslog_msg" => "message"
+              "syslog_pri" => "[metadata][category]"
+              "syslog_pid" => "[metadata][proc_id]"
+              "syslog_source" => "[kubernetes][node][name]"
+            }
+            remove_field => [ "program", "pid", "pri" ]
+          }
+          date {
+            match => [ "timestamp", "MMM dd HH:mm:ss" ]
+            target => "timestamp"
+          }
+        }
+        mutate {
+          add_field => {
+            "version" => "1.0.0"
+          }
+          gsub => [
+            "severity", "emergency|alert", "critical",
+            "severity", "notice|informational", "info"
+          ]
+        }
+      }
+    }
+
+    output {
+      pipeline { send_to => "searchengine_pipeline" }
+
+    {{- if $syslogOutput.enabled }}
+      pipeline { send_to => "syslog_pipeline" }
+    {{- end }}
+{{- if .Values.config.output }}
+  {{- range .Values.config.output }}
+      pipeline { send_to => {{ .name | quote}} }
+  {{- end }}
+{{- end }}
+{{- if .Values.config.fileOutput }}
+      file {
+        codec => line { format => "%{message}" }
+        path => "/tmp/logstash/logs/%{logplane}-%{+yyyy.MM.dd.HH}"
+      }
+{{- end }}
+{{- if .Values.egress.lumberjack.enabled }}
+      pipeline { send_to => "lumberjack_pipeline" }
+{{- end }}
+    }
+
+  searchengine.conf: |
+    input { pipeline { address => "searchengine_pipeline" } }
+
+    filter {
+{{- if .Values.searchengine.logplaneConfig }}
+  {{- range $index, $logplaneConfig := .Values.searchengine.logplaneConfig }}
+    {{- if and $logplaneConfig.value $logplaneConfig.field $logplaneConfig.newLogplane}}
+      {{- if eq $index 0 }}
+      if {{ $logplaneConfig.field }} == {{ $logplaneConfig.value | quote }} {
+      {{- else }}
+      else if {{ $logplaneConfig.field }} == {{ $logplaneConfig.value | quote }} {
+      {{- end }}
+        mutate {
+          replace => {"logplane" => {{ $logplaneConfig.newLogplane | quote}}}
+        }
+      }
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if .Values.searchengine.exclusion }}
+  {{- range $index, $exclusion := .Values.searchengine.exclusion }}
+    {{- if $exclusion.logplane }}
+      {{- if eq $index 0 }}
+      if [logplane] == {{ $exclusion.logplane | quote }} {
+      {{- else }}
+      else if [logplane] == {{ $exclusion.logplane | quote }} {
+      {{- end}}
+    {{- end}}
+          {{- range $i, $rules := .rules }}
+            {{- if and $rules.field $rules.value }}
+              {{- if eq $i 0 }}
+        if {{ $rules.field }} == {{ $rules.value | quote }} {
+              {{- else }}
+        else if {{ $rules.field }} == {{ $rules.value | quote }} {
+              {{- end}}
+          drop{}
+        }
+            {{- end}}
+          {{- end}}
+    {{- if $exclusion.logplane }}
+      }
+    {{- end}}
+  {{- end}}
+{{- end}}
+{{- if .Values.config.filter }}
+{{ .Values.config.filter | indent 6 }}
+{{- end }}
+    }
+
+    output {
+      if [@metadata][LOGSTASH_OUTPUT_STDOUT_IS_ENABLED] == "true" {
+        stdout { codec => rubydebug }
+      }
+      elasticsearch {
+        hosts => ["${ELASTICSEARCH_HOSTS}"]
+        index => "%{logplane}-%{+YYYY.MM.dd}"
+        http_compression => true
+        {{- if $g.security.tls.enabled }}
+        ssl => true
+        cacert => "/run/secrets/sip-tls-trusted-root-cert/ca.crt"
+        keystore => "/opt/logstash/certificates/se-http-client-cert/keystore.p12"
+        keystore_password => "%%KEYSTORE_PASS%%"
+        ssl_certificate_verification => true
+        {{- end }}
+      }
+    }
+
+  pipelines.yml: |
+    - pipeline.id: logstash
+      queue.type: persisted
+      queue.max_bytes: {{ printf "%dmb" (max 128 .Values.queue.sizePerPipeline) }}
+  {{- if $g.security.tls.enabled }}
+      path.config: "/opt/logstash/config/active/logstash.conf"
+  {{- else }}
+      path.config: "/opt/logstash/config/logstash.conf"
+  {{- end }}
+    - pipeline.id: elasticsearch
+      queue.type: persisted
+      queue.max_bytes: {{ printf "%dmb" (max 128 .Values.queue.sizePerPipeline) }}
+  {{- if $g.security.tls.enabled }}
+      path.config: "/opt/logstash/config/active/searchengine.conf"
+  {{- else }}
+      path.config: "/opt/logstash/config/searchengine.conf"
+  {{- end }}
+  {{- if $syslogOutput.enabled }}
+    - pipeline.id: syslog
+      queue.type: persisted
+      queue.max_bytes: {{ printf "%dmb" (max 128 .Values.queue.sizePerPipeline) }}
+    {{- if $syslogOutput.tls.enabled }}
+      path.config: "/opt/logstash/config/active/syslog_output.conf"
+    {{- else }}
+      path.config: "/opt/logstash/config/syslog_output.conf"
+    {{- end }}
+  {{- end }}
+  {{- if .Values.egress.lumberjack.enabled }}
+    - pipeline.id: lumberjack
+      queue.type: persisted
+      queue.max_bytes: {{ printf "%dmb" (max 128 .Values.queue.sizePerPipeline) }}
+      path.config: "/opt/logstash/config/active/lumberjack_output.conf"
+  {{- end }}
+{{- if .Values.config.output }}
+  {{- $customOutputSize := max 128 .Values.queue.sizePerPipeline}}
+  {{- range .Values.config.output }}
+    - pipeline.id: {{ .name }}
+      queue.type: persisted
+      queue.max_bytes: {{ printf "%dmb" $customOutputSize }}
+      path.config: "/opt/logstash/config/{{ .name }}.conf"
+  {{- end }}
+{{- end }}
+
+{{- if .Values.egress.lumberjack.enabled }}
+
+  lumberjack_output.conf: |
+   # Don't remove below comment, this is used for certificate reload
+   # CERT_HASH="%%CERT_HASH%%"
+   input { pipeline { address => "lumberjack_pipeline" } }
+
+    output {
+      {{- range .Values.egress.lumberjack.remoteHosts }}
+      lumberjack {
+        id => {{ .id | quote }}
+        hosts => [{{ .host  | quote }}]
+        codec => {{ .codec | quote }}
+        port => {{ .port }}
+        ssl_certificate => "/run/secrets/lumberjackOutput-certs/tls.crt"
+      }
+      {{- end }}
+    }
+{{- end }}
+
+{{- if $syslogOutput.enabled }}
+
+  syslog_output.conf: |
+   # Don't remove below comment, this is used for certificate reload
+   # CERT_HASH="%%CERT_HASH%%"
+   input { pipeline { address => "syslog_pipeline" } }
+
+    filter {
+    {{- if $syslogOutput.filter }}
+      {{- $syslogOutput.filter | nindent 6 }}
+    {{- end }}
+ {{- if $syslogOutput.inclusions }}
+  {{- range $i, $rules := $syslogOutput.inclusions }}
+    {{- if and $rules.field $rules.value }}
+      {{- if eq $i 0 }}
+      if {{ $rules.field }} == {{ $rules.value | quote }}
+      {{- else }}
+      or {{ $rules.field }} == {{ $rules.value | quote }}
+      {{- end}}
+      {{- end}}
+    {{- end}}
+      {
+{{- end}}
+{{- if $syslogOutput.exclusions }}
+  {{- range $index, $exclusions := $syslogOutput.exclusions }}
+    {{- if $exclusions.logplane }}
+      {{- if eq $index 0 }}
+      if [logplane] == {{ $exclusions.logplane | quote }} {
+      {{- else }}
+      else if [logplane] == {{ $exclusions.logplane | quote }} {
+      {{- end}}
+    {{- end}}
+
+          {{- range $i, $rules := .rules }}
+            {{- if and $rules.field $rules.value }}
+              {{- if eq $i 0 }}
+        if {{ $rules.field }} == {{ $rules.value | quote }} {
+              {{- else }}
+        else if {{ $rules.field }} == {{ $rules.value | quote }} {
+              {{- end}}
+          drop{}
+        }
+            {{- end}}
+          {{- end}}
+    {{- if $exclusions.logplane }}
+      }
+    {{- end}}
+  {{- end}}
+{{- end}}
+
+{{- if $syslogOutput.inclusions }}
+      }
+      else {
+        drop{}
+      }
+{{- end}}
+
+      ruby {
+        code => "
+         severity = ([
+          'emergency',
+          'alert',
+          'critical',
+          'error',
+          'warning',
+          'notice',
+          'informational',
+          'debug'].index(unless event.get('[severity]').nil? then event.get('[severity]').downcase else '' end) || {{ $syslogOutput.defaultSeverity }})
+
+           # Fallback to user-level if unknown facility code
+           priority = (([
+           'kernel',
+           'user-level',
+           'mail',
+           'daemon',
+           'security/authorization',
+           'syslogd',
+           'line printer',
+           'network news',
+           'uucp',
+           'clock',
+           'security/authorization',
+           'ftp',
+           'ntp',
+           'log audit',
+           'log alert',
+           'clock',
+           'local0',
+           'local1',
+           'local2',
+           'local3',
+           'local4',
+           'local5',
+           'local6',
+           'local7'].index(unless event.get('[facility]').nil? then event.get('[facility]').downcase else '' end) || {{ $syslogOutput.defaultFacility }}) * 8) + severity
+
+          event.set('priority', priority)
+          event.set('version', '1')
+          event.set('message', event.get('[message]') || '-')
+          event.set('timestamp', event.get('[timestamp]'))
+          event.set('appname', event.get('[service_id]') || '-')
+          event.set('sourcehost', event.get('[kubernetes][node][name]') || '-')
+          event.set('[metadata][proc_id]', event.get('[metadata][proc_id]') || '-')
+          event.set('[metadata][category]', event.get('[metadata][category]') || '-')"
+      }
+      mutate {
+        replace => { "type" => "syslog_generated" }
+      }
+    }
+    output {
+      {{- if (and $syslogOutput.enabled $syslogOutput.tls.enabled) }}
+      {{- range $syslogOutput.remoteHosts }}
+      syslog {
+        host => {{ .host  | quote }}
+        port => {{ .port }}
+        protocol => "ssl-tcp"
+        rfc => rfc5424
+        use_labels => false
+        appname => "%{appname}"
+        priority => "%{priority}"
+        message => "%{message}"
+        sourcehost => "%{sourcehost}"
+        procid => "%{[metadata][proc_id]}"
+        msgid => "%{[metadata][category]}"
+        ssl_cert => "/run/secrets/syslogOutput-certs/tls.crt"
+        ssl_key => "/run/secrets/syslogOutput-certs/tls.key"
+        ssl_cacert => ["/run/secrets/syslogOutput-cacerts/trustedcert"]
+        ssl_verify => true
+      }
+      {{- end }}
+      {{- else }}
+      {{- range $syslogOutput.remoteHosts }}
+      syslog {
+        host => {{ .host  | quote }}
+        port => {{ .port }}
+        protocol => tcp
+        rfc => rfc5424
+        use_labels => false
+        appname => "%{appname}"
+        priority => "%{priority}"
+        message => "%{message}"
+        sourcehost => "%{sourcehost}"
+        procid => "%{[metadata][proc_id]}"
+        msgid => "%{[metadata][category]}"
+      }
+      {{- end }}
+      {{- end }}
+    }
+{{- end }}
+
+{{- if .Values.config.output }}
+  {{- range .Values.config.output }}
+
+  {{ .name }}.conf: |
+    input { pipeline { address => {{ .name | quote }} } }
+    {{- if .filter }}
+    filter {
+{{ .filter  | indent 6 }}
+    }
+    {{- end }}
+    output {
+{{ .output  | indent 6 }}
+    }
+  {{- end }}
+{{- end }}
+
+{{- if .Values.config.adpJson.validation.enabled }}
+  adp-json-validation.rb: |
+    {{- .Files.Get "configs/adp-json-validation.rb" | indent 4 }}
+{{- end }}

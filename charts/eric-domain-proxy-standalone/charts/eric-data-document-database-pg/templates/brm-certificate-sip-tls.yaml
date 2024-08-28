@@ -1,0 +1,33 @@
+{{- if and .Values.brAgent.enabled (not (eq (include "eric-data-document-database-pg.global-security-tls-enabled" .) "false")) }}
+apiVersion: siptls.sec.ericsson.com/v1alpha1
+kind: InternalCertificate
+metadata:
+ name: {{ template "eric-data-document-database-pg.secretBaseName" . }}-brm-cert
+ annotations:
+   ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+   ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+   ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+ labels:
+    app: {{ template "eric-data-document-database-pg.name" . }}
+    chart: {{ template "eric-data-document-database-pg.chart" . }}
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service }}
+{{- include "eric-data-document-database-pg_app_kubernetes_io_info" .| nindent 4 }}
+spec:
+ kubernetes:
+  generatedSecretName: {{ template "eric-data-document-database-pg.secretBaseName" . }}-brm-cert
+  certificateName: brm-cert.pem
+  privateKeyName: brm-privkey.pem
+ certificate:
+  subject:
+   cn: ddb-pg-backup-restore-agent
+  subjectAlternativeName:
+   dns:
+      - {{ template "eric-data-document-database-pg.name" . }}-bragent
+      - {{ template "eric-data-document-database-pg.name" . }}-bragent.{{.Release.Namespace}}
+      - {{ template "eric-data-document-database-pg.name" . }}-bragent.{{.Release.Namespace}}.svc
+      - {{ template "eric-data-document-database-pg.name" . }}-bragent.{{.Release.Namespace}}.svc.{{.Values.k8sClusterInfo.clusterDomain}}
+  extendedKeyUsage:
+   tlsClientAuth: true
+   tlsServerAuth: true
+{{- end }}

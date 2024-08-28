@@ -1,0 +1,15 @@
+{{- define "eric-enm-common-helmchart-library.poddisruptionbudget.tpl" -}}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+{{ include "eric-enm-common-helmchart-library.metadata" . | indent 2 }}
+  name: "{{ .Chart.Name }}-pdb"
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+{{ toYaml .Values.podDisruptionBudget | indent 2 }}
+{{- end }}
+{{- define "eric-enm-common-helmchart-library.poddisruptionbudget" -}}
+{{- template "eric-enm-common-helmchart-library.util.merge" (append . "eric-enm-common-helmchart-library.poddisruptionbudget.tpl") -}}
+{{- end -}}

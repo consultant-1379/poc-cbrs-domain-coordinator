@@ -1,0 +1,117 @@
+## poc-cbrs-domain-coordinator image version
+
+global:
+  registry:
+    url: armdocker.rnd.ericsson.se
+    pullSecret:
+  ingress:
+    enmHost: ieatenmc15a036.athtem.eei.ericsson.se
+  enmProperties:
+    ## TODO EDENOCO:: for snapshot testing only - DONT MERGE THESE VALUE SETTINGS!!
+    postgres_service: 
+    postgresql01_admin_password:
+  timezone:
+productInfo:
+  # R-State of the product. R State should match helm chart version (3.1.0 -> R2A)
+  # To automate it when packaging the helm chart rstate can be generated
+  # and below value replaced with correct R-State
+  number: CXC 174 2027
+  rstate: RSTATE
+# Number of replicas(pods) to deploy
+replicas-poc-cbrs-domain-coordinator: 2
+images:
+  poc-cbrs-domain-coordinator:
+    name: eric-enmsg-dpmediation
+    #tag: VERSION
+    tag: poc3
+  waitInitContainer:
+    enabled: false
+    name: eric-enm-init-container
+    tag: 1.7.0-8
+    command: "[ '/bin/sh', '-c', 'bash /var/tmp/check_service.sh -s gossiprouter-cache,gossiprouter-remoting,jms01,postgres,sps,secserv'
+      ]"
+  eric-enm-monitoring:
+    enabled: true
+    name: eric-enm-monitoring-eap7
+    tag: latest
+imageCredentials:
+  #repoPath: proj-enm
+  repoPath: proj_oss_releases/enm
+  pullPolicy: Always
+  registry:
+    url:
+    pullSecret:
+## Configure the service
+service:
+  name: dpmediation
+  sgname: dpmediation
+  loadBalancerIP: 
+  annotations: {}
+  labels: {}
+ingress:
+  enabled: false
+ingress_jboss_web_context:
+  enabled: false
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+eric-enm-common-helmchart-library:
+  enabled: true
+resources:
+  requests:
+    enabled: true
+    memory: 1786Mi
+  limits:
+    enabled: true
+    memory: 8096Mi
+  httpd:
+    enabled: false
+    requests:
+      memory:
+      cpu:
+    limits:
+      memory:
+      cpu:
+  monitoring:
+    enabled: false
+    requests:
+      memory:
+      cpu:
+    limits:
+      memory:
+      cpu:
+# LivenessProbe Health Check configuration.
+livenessProbe:
+  enabled: true
+  command: /opt/ericsson/vmmonitord/bin/ocf_monitor.py
+  arguments: --exec_agents
+  initialDelaySeconds: 600
+  timeoutSeconds: 15
+  periodSeconds: 30
+  failureThreshold: 1
+readinessProbe:
+  enabled: true
+  command: /opt/ericsson/vmmonitord/bin/ocf_monitor.py
+  arguments: --exec_agents
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 1
+# Extra Annotations to be added to pod
+podAnnotations: {}
+## Tolerations for pod assignment
+tolerations: []
+## Affinity for pod assignment
+affinity: requiredDuringSchedulingIgnoredDuringExecution
+# Constrain which nodes your pod is eligible to be scheduled on
+nodeAffinity: {}
+priorityClassName: ""
+## Node selector
+nodeSelector: {}
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0
+## Pod Disruption Budget is an indicator of the number of disruptions that can be tolerated at a given time.
+podDisruptionBudget:
+  maxUnavailable: 1

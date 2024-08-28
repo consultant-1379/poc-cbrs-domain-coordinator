@@ -1,0 +1,20 @@
+{{- $g := fromJson (include "eric-ctrl-bro.globalMap" .) -}}
+{{- if $g.security.policyBinding.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "eric-ctrl-bro.name" . }}-rb
+  annotations:
+    {{- include "eric-ctrl-bro.prodInfoAnnotations" . | indent 4 }}
+    ericsson.com/security-policy.capabilities: ""
+    ericsson.com/security-policy.type: "restricted/default"
+  labels:
+{{ include "eric-ctrl-bro.k8sLabels" . | indent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ index $g.security.policyReferenceMap "default-restricted-security-policy" | quote }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "eric-ctrl-bro.serviceAccountName" . }}
+{{- end -}}

@@ -1,0 +1,3 @@
+- name: eap7
+  port: 12003
+  targetPort: 12003

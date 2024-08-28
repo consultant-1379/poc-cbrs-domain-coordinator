@@ -1,0 +1,4 @@
+- backend:
+    serviceName: dpmediation
+    servicePort: 443
+  path: /cbsd-domain-coordinator-app/

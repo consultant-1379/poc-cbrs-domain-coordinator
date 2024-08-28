@@ -1,0 +1,21 @@
+{{- range $ct := .Values.config.certm_tls }}
+apiVersion: com.ericsson.sec.certm/v1alpha2
+kind: ExternalCertificate
+metadata:
+  name: {{ template "eric-pm-server.name" $ }}-{{ $ct.name }}-asymmetric-key-cert-consumer
+  annotations:
+{{- include "eric-pm-server.helm-annotations" $ | indent 2 }}
+  labels:
+    app.kubernetes.io/name: {{ template "eric-pm-server.name" $ }}
+    app.kubernetes.io/version: {{ template "eric-pm-server.version" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app: {{ template "eric-pm-server.name" $ }}
+    chart: {{ template "eric-pm-server.chart" $ }}
+    release: {{ $.Release.Name }}
+    heritage: {{ $.Release.Service }}
+spec:
+  generated-secret-name: {{ template "eric-pm-server.name" $ }}-{{ $ct.name }}-asymmetric-key-cert-consumer-secret
+  generated-secret-type: tls
+  asymmetric-key-certificate-name: {{ $ct.clientKeyName }}/{{ $ct.clientCertName }}
+---
+{{- end -}}

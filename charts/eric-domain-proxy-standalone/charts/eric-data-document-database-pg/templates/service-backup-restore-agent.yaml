@@ -1,0 +1,26 @@
+{{- if .Values.brAgent.enabled  }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "eric-data-document-database-pg.name" . }}-bragent
+  labels:
+    app: {{ template "eric-data-document-database-pg.name" . }}-bragent
+{{- include "eric-data-document-database-pg_app_kubernetes_io_info" .| nindent 4 }}
+  annotations:
+    ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+    ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+    ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+spec:
+  selector:
+    app: {{ template "eric-data-document-database-pg.name" . }}-bragent
+  type: {{ default "ClusterIP" .Values.service.type }}
+  ports:
+  - name: http
+    port: 8083 
+    targetPort: 8083
+  {{- if (eq (include "eric-data-document-database-pg.internalIPFamily" .) "IPv4") }}
+  ipFamilies: ["IPv4"]
+  {{- else if (eq (include "eric-data-document-database-pg.internalIPFamily" .) "IPv6") }}
+  ipFamilies: ["IPv6"]
+  {{- end }}
+{{- end }}

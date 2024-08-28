@@ -1,0 +1,27 @@
+{{ define "eric-enm-common-helmchart-library.affinity.tpl" -}}
+{{- if .Values.affinity }}
+affinity:
+  podAntiAffinity:
+    {{ if eq .Values.affinity "requiredDuringSchedulingIgnoredDuringExecution" }}
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - {{ .Values.service.name }}
+      topologyKey: "kubernetes.io/hostname"
+    {{ else }}
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - {{ .Values.service.name }}
+          topologyKey: "kubernetes.io/hostname"
+        weight: 1
+    {{ end }}
+{{- end }}
+{{- end -}}

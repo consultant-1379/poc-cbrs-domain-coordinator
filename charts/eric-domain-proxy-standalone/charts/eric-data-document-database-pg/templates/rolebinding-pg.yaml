@@ -1,0 +1,45 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "eric-data-document-database-pg.name" . }}-rolebinding
+  labels:
+{{- include "eric-data-document-database-pg_app_kubernetes_io_info" .| nindent 4 }}
+  annotations:
+    ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+    ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+    ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "eric-data-document-database-pg.name" . }}-role
+subjects:
+- kind: ServiceAccount
+  name: {{ template "eric-data-document-database-pg.name" . }}-sa
+
+---
+
+{{- if .Values.global -}}
+  {{- if .Values.global.security -}}
+    {{- if .Values.global.security.policyBinding -}}
+      {{- if .Values.global.security.policyBinding.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "eric-data-document-database-pg.name" . }}-sa-security-policy
+  labels:
+{{- include "eric-data-document-database-pg_app_kubernetes_io_info" .| nindent 4 }}
+  annotations:
+    ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+    ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+    ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "eric-data-document-database-pg.securityPolicy.reference" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "eric-data-document-database-pg.name" . }}-sa
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}

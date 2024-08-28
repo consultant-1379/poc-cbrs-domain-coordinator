@@ -1,0 +1,96 @@
+dependencies:
+- name: eric-data-document-database-pg
+  version: 5.5.0+50
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-data-document-database-pg
+  - eric-dp-common
+- name: eric-pm-server
+  version: 6.0.0+15
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-pm-server
+  - eric-dp-common 
+- name: eric-log-shipper
+  version: 5.3.0+14
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-log-shipper
+  - eric-dp-common
+- name: eric-data-search-engine
+  version: 6.1.0+66
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-data-search-engine
+  - eric-dp-common
+- name: eric-data-search-engine-curator
+  version: 2.4.0+15
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-dp-common
+  - eric-data-search-engine-curator
+- name: eric-log-transformer
+  version: 5.6.0+27
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-log-transformer
+  - eric-dp-common
+- name: eric-ctrl-bro
+  version: 4.2.0+38
+  repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  tags:
+  - eric-ctrl-bro
+  - eric-dp-common
+- name: eric-cnom-server
+  version: 1.62.2+6
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-pc-rs-released-helm
+  tags:
+  - eric-cnom-server
+  - eric-dp-common
+- name: eric-cnom-document-database-mg
+  version: 1.4.18+1
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-pc-released-helm
+  tags:
+  - eric-cnom-document-database-mg
+  - eric-dp-common
+# - name: eric-tm-ingress-controller-cr
+  # version: 5.4.0+18
+  # repository: https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-adp-gs-all-helm
+  # tags:
+  # - eric-dp-common
+  # - eric-tm-ingress-controller-cr
+- name: eric-enm-monitoring-master
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.9.0-28
+  tags:
+  - eric-oss-monitoring
+  - eric-dp-common
+- name: eric-enm-monitoring-remotewriter
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.9.0-27
+  tags:
+  - eric-oss-monitoring
+  - eric-dp-common
+- name: eric-enmsg-dpmediation
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.9.0-26
+  tags:
+  - eric-enmsg-dpmediation
+- name: eric-enm-sfwkdb-schemamgt
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.10.0-8
+  tags:
+  - eric-enm-sfwkdb-schemamgt 
+  - eric-dp-common
+- name: eric-enmsg-gossiprouter-cache
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.10.0-8
+  tags:
+  - eric-enmsg-gossiprouter-cache 
+  - eric-dp-common
+- name: eric-enmsg-gossiprouter-eap7
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.10.0-8
+  tags:
+  - eric-enmsg-gossiprouter-eap7 
+  - eric-dp-common

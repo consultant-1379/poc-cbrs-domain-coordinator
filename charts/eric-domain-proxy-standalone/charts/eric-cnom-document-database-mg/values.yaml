@@ -1,0 +1,261 @@
+# Global Docker image parameters
+# Please, note that this will override the image parameters, including
+# dependencies, configured to use the global value
+# global:
+#   # The timezone. See the tz database (a.k.a. IANA time zone database) for valid names.
+#   timezone: UTC
+#   registry:
+#     url: selndocker.mo.sw.ericsson.se
+#     pullSecret: ""
+#   # A map of key-value pairs of node selectors
+#   nodeSelector:
+#   # The IP family the service belongs to when service.type is set to ClusterIP.
+#   # Options are: IPv4, IPv6
+#   internalIPFamily:
+
+imageCredentials:
+  repoPath: proj-pc-released
+  pullPolicy: IfNotPresent
+  registry:
+    url:
+    pullSecret: ""
+
+images:
+  mongodb:
+    name: eric-cnom-document-database-mg
+    tag: 1.4.18-1
+
+productInfo:
+  name: Core Network Operations Manager
+  revision: R5Y
+  productNumber: CXS
+
+# String to override eric-cnom-document-database-mg.name template
+nameOverride:
+
+## Enable authentication
+## Must be enabled if replicaSet.enabled is true.
+usePassword: true
+# existingSecret: name-of-existing-secret
+
+## MongoDB admin password. Will auto-generate one if omitted.
+# mongodbRootPassword:
+
+## MongoDB custom user
+mongodbUsername: cnom-user
+## Custom password. Will auto-generate one if omitted.
+# mongodbPassword: password
+
+## Whether enable/disable IPv6 on MongoDB
+mongodbEnableIPv6: true
+
+## Whether enable/disable DirectoryPerDB on MongoDB
+##
+mongodbDirectoryPerDB: false
+
+## MongoDB System Log configuration
+##
+mongodbSystemLogVerbosity: 0
+mongodbDisableSystemLog: true
+
+## MongoDB additional command line flags
+##
+## Can be used to specify command line flags, for example:
+##
+## mongodbExtraFlags:
+##  - "--wiredTigerCacheSizeGB=2"
+mongodbExtraFlags: []
+
+## Pod Security Context
+##
+securityContext:
+  enabled: true
+  fsGroup: 1001
+  runAsUser: 1001
+
+## Kubernetes Cluster Domain
+clusterDomain: cluster.local
+
+# A map of key-value pairs of node selectors
+nodeSelector: {}
+
+## Kubernetes service type
+service:
+  ## Specify an explicit service name.
+  # name: svc-mongo
+  ## Provide any additional annotations which may be required.
+  ## The value is evaluated as a template, so, for example, the value can depend on .Release or .Chart
+  annotations: {}
+  # clusterIP: None
+  port: 27017
+
+## Setting up replication
+#
+replicaSet:
+  ## Whether to create a MongoDB replica set for high availability or not
+  ## If enabled, usePassword should be set to true and mongodbRootPassword should be provided
+  enabled: false
+  useHostnames: true
+
+  ## Name of the replica set
+  ##
+  name: rs0
+
+  ## Key used for replica set authentication
+  ##
+  # key: key
+
+  ## Number of replicas per each node type
+  ##
+  replicas:
+    primary: 1
+    secondary: 1
+    arbiter: 1
+
+  ## Pod Disruption Budget
+  pdb:
+    enabled: true
+    minAvailable:
+      primary: 1
+      secondary: 1
+      arbiter: 1
+    # maxUnavailable:
+      # primary: 1
+      # secondary: 1
+      # arbiter: 1
+
+# Annotations to be added to the deployment or statefulsets
+annotations: {}
+
+# Additional labels to apply to the deployment or statefulsets
+labels: {}
+
+# Annotations to be added to MongoDB pods
+podAnnotations: {}
+
+# Additional pod labels to apply
+podLabels: {}
+
+## Use an alternate scheduler, e.g. "stork".
+##
+# schedulerName:
+
+## Configure resource requests and limits
+##
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 512Mi
+# Define separate resources per arbiter, which are less then primary or secondary
+# used only when replica set is enabled
+resourcesArbiter: {}
+
+## Pod priority
+# priorityClassName: ""
+
+## Affinity
+affinity: {}
+# Define separate affinity for arbiter pod
+affinityArbiter: {}
+
+## Tolerations
+tolerations: []
+
+## Update Strategy
+updateStrategy:
+  type: Recreate
+
+## Enable persistence using Persistent Volume Claims
+##
+persistence:
+  enabled: true
+  ## A manually managed Persistent Volume and Claim
+  ## Requires persistence.enabled: true
+  ## If defined, PVC must be created manually before volume will be bound
+  ##
+  # existingClaim:
+
+  ## The path the volume will be mounted at, useful when using different
+  ## MongoDB images.
+  ##
+  mountPath: /mongodb/data/db
+
+  ## The subdirectory of the volume to mount to, useful in dev environments
+  ## and one PV for multiple services.
+  ##
+  subPath: eric-cnom-document-database-mg
+
+  ## mongodb data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+## Configure extra options for liveness and readiness probes
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+# Define custom config map with init scripts
+initConfigMap: {}
+#  name: "init-config-map"
+
+configmap:
+#  # where and how to store data.
+#  storage:
+#    dbPath: /mongodb/data/db
+#    journal:
+#      enabled: true
+#    directoryPerDB: false
+#  # where to write logging data.
+#  systemLog:
+#    destination: file
+#    quiet: false
+#    logAppend: true
+#    logRotate: reopen
+#    path: /opt/ericsson/mongodb/logs/mongodb.log
+#    verbosity: 0
+#  # network interfaces
+#  net:
+#    port: 27017
+#    unixDomainSocket:
+#      enabled: true
+#      pathPrefix: /opt/ericsson/mongodb/tmp
+#    ipv6: true
+#    bindIpAll: true
+#  # replica set options
+#  #replication:
+#    #replSetName: replicaset
+#    #enableMajorityReadConcern: true
+#  # process management options
+#  processManagement:
+#     fork: false
+#     pidFilePath: /opt/ericsson/mongodb/tmp/mongodb.pid
+#  # set parameter options
+#  setParameter:
+#     enableLocalhostAuthBypass: true
+#  # security options
+#  security:
+#    authorization: disabled
+#    #keyFile: /opt/ericsson/mongodb/conf/keyfile

@@ -1,0 +1,35 @@
+{{- define "eric-enm-common-helmchart-library.postinstall-credm-controller-job.tpl" -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{.Values.service.name}}-postinstall-credm
+  labels:
+    {{ .Values.service.labels }}
+  annotations:
+    "helm.sh/hook": "post-install"
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      containers:
+        - name: {{.Values.service.name}}-post-install-credm
+          image: "{{ .Values.global.registry.url }}/{{ .Values.imageCredentials.repoPath }}/{{ .Values.hooks.postInstall.imageName }}:{{ .Values.hooks.postInstall.tag }}"
+          imagePullPolicy: {{.Values.hooks.postInstall.pullPolicy}}
+          command:
+          env:
+            - name: CONTROLLER_NAME
+              value: {{.Values.credmController.name | quote}}
+            - name: CONTROLLER_PORT
+              value: {{.Values.credmController.port | quote}}
+            - name: SERVICENAME
+              value: {{.Values.service.name | quote}}
+            - name: HOOKACTION
+              value: "installation"
+            - name: HOOKNAME
+              value: "mainservice"
+      restartPolicy: Never
+  backoffLimit: 4
+{{- end -}}

@@ -1,0 +1,81 @@
+{{- $g := fromJson (include "eric-log-transformer.global" .) -}}
+{{- $d := fromJson (include "eric-log-transformer.deprecated" .) -}}
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . | quote }}
+  labels:
+{{- include "eric-log-transformer.labels" . | indent 4 }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+  {{- if and (.Values.metrics.enabled) $g.security.tls.enabled }}
+    prometheus.io/scrape: {{ .Values.metrics.enabled | quote }}
+    prometheus.io/port: "9115"
+    prometheus.io/scheme: "https"
+  {{- end }}
+
+spec:
+  {{- if $g.internalIPFamily }}
+  ipFamilies: [{{ $g.internalIPFamily | quote }}]
+  {{- end }}
+  selector:
+    app: {{ include "eric-log-transformer.fullname" . | quote }}
+    component: log
+    role: indexer
+  type: ClusterIP
+  ports:
+  {{- if $g.security.tls.enabled }}
+  - name: "tls-syslog-tcp"
+    port: 5015
+    protocol: TCP
+  - name: "tls-filebeat"
+    port: 5044
+    protocol: TCP
+  - name: "tls-json-tcp"
+    port: 5024
+    protocol: "TCP"
+  {{- end }}
+  {{- if or (not $g.security.tls.enabled) (eq .Values.service.endpoints.syslogIn.tls.enforced "optional") }}
+  - name: syslog-tcp
+    port: 5014
+    protocol: TCP
+  - name: syslog-udp
+    port: 5014
+    protocol: UDP
+  {{- end }}
+  {{- if or (not $g.security.tls.enabled) (eq .Values.service.endpoints.jsonIn.tls.enforced "optional") }}
+  - name: "json-tcp"
+    port: 5025
+    protocol: "TCP"
+  {{- end }}
+  {{- if or (or (not $g.security.tls.enabled) (eq .Values.service.endpoints.filebeat.tls.enforced "optional")) (or $d.security.tls.logshipper.enabled $d.security.tls.eda) }}
+  - name: filebeat
+    port: 5045
+    protocol: TCP
+  {{- end }}
+  - name: logstash
+    port: {{ .Values.service.portApi }}
+    protocol: TCP
+  {{- if .Values.input }}
+  {{- if .Values.input.tcp }}
+  {{- if .Values.input.tcp.enable }}
+  - name: "json-tcp-eda"
+    port: 5018
+    protocol: TCP
+  {{- end }}
+  {{- end }}
+  {{- end }}
+{{- if .Values.metrics.enabled }}
+  {{- if $g.security.tls.enabled }}
+  - name: "metrics-tls"
+    port: 9115
+    protocol: "TCP"
+  {{- else }}
+  - name: "metrics"
+    port: 9114
+    protocol: "TCP"
+  {{- end }}
+{{- end }}

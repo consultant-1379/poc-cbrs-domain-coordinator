@@ -1,0 +1,22 @@
+{{- if .Values.podDisruptionBudget -}}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: {{ .Values.service.name | quote }}
+  {{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname | quote }}
+  {{- end }}
+    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ .Values.service.name | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ template "eric-enmsg-dpmediation.chart" . }}
+  annotations:
+  {{- include "eric-enmsg-dpmediation.product-info" . | indent 4 }}
+  name: "{{ .Release.Name }}-pdb"
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+{{ toYaml .Values.podDisruptionBudget | indent 2 }}
+{{- end -}}

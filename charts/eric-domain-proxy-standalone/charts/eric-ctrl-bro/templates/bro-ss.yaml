@@ -1,0 +1,125 @@
+{{- $configMapName := include "eric-ctrl-bro.name" . -}}
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "eric-ctrl-bro.name" . }}
+  labels:
+{{ include "eric-ctrl-bro.k8sLabels" . | indent 4 }}
+{{- include "eric-ctrl-bro.prodInfoLabels" . | indent 4}}
+  annotations:
+{{ include "eric-ctrl-bro.prodInfoAnnotations" . | indent 4 }}
+spec:
+  selector:
+    matchLabels:
+     app.kubernetes.io/name: {{ template "eric-ctrl-bro.name" . }}
+     app.kubernetes.io/instance: {{.Release.Name | quote }}
+  serviceName: {{ template "eric-ctrl-bro.name" . }}
+  replicas: {{ .Values.bro.replicas }}
+  updateStrategy:
+    type: {{ .Values.updateStrategy.type | quote }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "eric-ctrl-bro.name" . }}
+        app.kubernetes.io/version: {{ template "eric-ctrl-bro.version" . }}
+        app.kubernetes.io/instance: {{.Release.Name | quote }}
+        {{- include "eric-ctrl-bro.prodInfoLabels" . | indent 8}}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/serviceproperties-configmap.yaml") . | sha256sum }}
+        checksum/log: {{ include (print $.Template.BasePath "/logging-configmap.yaml") . | sha256sum }}
+        checksum/check: {{ include (print $.Template.BasePath "/productcheck-configmap.yaml") . | sha256sum }}
+        {{- if .Values.monitoring.enabled }}
+        {{- if eq .Values.monitoring.enabled true }}
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/scrape: "true"
+        {{- if (eq (include "eric-ctrl-bro.globalSecurity" .) "true") }}
+        prometheus.io/port: "7003"
+        prometheus.io/scheme: https
+        {{- else }}
+        prometheus.io/port: "7001"
+        prometheus.io/scheme: http
+        {{- end }}
+        {{- end }}
+        {{- end }}
+{{ include "eric-ctrl-bro.prodInfoAnnotations" . | indent 8 }}
+    spec:
+{{- include "eric-ctrl-bro.pullsecret" . }}
+      serviceAccountName: {{ template "eric-ctrl-bro.serviceAccountName" . }}
+      automountServiceAccountToken: true
+      terminationGracePeriodSeconds: {{ .Values.bro.terminationGracePeriodSeconds }}
+      securityContext:
+        fsGroup: {{ include "eric-ctrl-bro.fsGroup.coordinated" . }}
+      containers:
+      - name: {{ template "eric-ctrl-bro.name" . }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - all
+        image: {{template "eric-ctrl-bro.image" . }}
+        {{ include "eric-ctrl-bro.pullpolicy" . }}
+        env:
+        - name: STORAGE_CONNECTIVITY
+          value: {{ .Values.persistence.persistentVolumeClaim.storageConnectivity | quote }}
+        - name: TZ
+          value: {{ template "eric-ctrl-bro.timezone" . }}
+        - name: {{ .Values.bro.namespaceEnvironmentVariable }}
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        ports:
+        - name: grpc
+          containerPort: {{template "eric-ctrl-bro.globalBroGrpcServicePort" .}}
+        - name: rest
+          containerPort: {{.Values.bro.restPort}}
+          {{- if eq (include "eric-ctrl-bro.global.tls" .) "true" }}
+        - name: resttls
+          containerPort: {{.Values.bro.restTlsPort}}
+        - name: pm-tls
+          containerPort: {{.Values.bro.pmTlsPort}}
+          {{- if eq .Values.bro.enableConfigurationManagement true }}
+        - name: cmm-tls
+          containerPort: {{.Values.bro.cmmNotifTlsPort}}
+          {{- end }}
+          {{- end }}
+        resources:
+{{- toYaml .Values.resources.backupAndRestore | nindent 10 }}
+        livenessProbe:
+          {{ include "eric-ctrl-bro.livenessProbe" . }}
+          initialDelaySeconds: {{ .Values.bro.livenessProbeInitialDelaySeconds }}
+          timeoutSeconds: {{ .Values.bro.livenessProbeTimeoutSeconds }}
+        readinessProbe:
+          {{ include "eric-ctrl-bro.readinessProbe" . }}
+          initialDelaySeconds: {{ .Values.bro.readinessProbeInitialDelaySeconds }}
+          timeoutSeconds: {{ .Values.bro.readinessProbeTimeoutSeconds }}
+        volumeMounts:
+{{ include "eric-ctrl-bro.volumeMounts" . | indent 8 }}
+        - name: backup-data
+          mountPath: {{ .Values.bro.backupLocation | quote }}
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 0
+      volumes:
+{{ include "eric-ctrl-bro.volumes" . | indent 6 }}
+{{ include "eric-ctrl-bro.nodeSelector" . | indent 6 }}
+  volumeClaimTemplates:
+  - metadata:
+      name: backup-data
+    spec:
+      accessModes:
+        - "ReadWriteOnce"
+      resources:
+        requests:
+          storage: {{ .Values.persistence.persistentVolumeClaim.size | quote }}
+      {{- if and (ne .Values.persistence.persistentVolumeClaim.storageClassName "default") (.Values.persistence.persistentVolumeClaim.storageClassName) }}
+      storageClassName: {{ .Values.persistence.persistentVolumeClaim.storageClassName | quote }}
+      {{- end }}

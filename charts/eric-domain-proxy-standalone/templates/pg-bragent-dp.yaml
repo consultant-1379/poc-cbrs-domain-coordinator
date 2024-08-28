@@ -1,0 +1,18 @@
+{{- if .Values.dpCommon -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eric-enmsg-dpmediation-pg-brm-config
+  labels:
+    app: eric-data-document-database-pg
+    app.kubernetes.io/name: eric-enmsg-dpmediation 
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  brm_backup.yaml: |
+    backupRestoreMetadataConfig:
+      - backupType: configuration-data
+        username: postgres
+        database: domainproxydb
+        inOutTables: none
+{{- end -}}

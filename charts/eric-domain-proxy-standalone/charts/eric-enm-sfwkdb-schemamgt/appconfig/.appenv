@@ -1,0 +1,11 @@
+NAME=eric-enm-sfwkdb-schemamgt
+PERSIST=true
+PERSIST_LIST=ReadWriteOnce,2Gi
+WAIT=true
+WAIT_LIST=postgres
+SVC=sfwkdb-schemamgt
+REQUESTS=true
+REQUESTS_LIST=1024Mi
+LIMITS=true
+LIMITS_LIST=4096Mi
+

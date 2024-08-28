@@ -1,0 +1,62 @@
+{{- define "eric-enm-common-helmchart-library.deployment.tpl" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+{{ include "eric-enm-common-helmchart-library.metadata" . | indent 2 }}
+spec:
+  replicas: {{ template "eric-enm-common-helmchart-library.replicas" . }}
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  strategy:
+    type: {{ .Values.updateStrategy.type }}
+{{- if and (eq .Values.updateStrategy.type "RollingUpdate") .Values.updateStrategy.rollingUpdate }}
+    rollingUpdate:
+{{ toYaml .Values.updateStrategy.rollingUpdate | indent 6 }}
+{{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+        app.kubernetes.io/name: "{{ .Values.service.name }}"
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
+        app.kubernetes.io/version: {{ template "eric-enm-common-helmchart-library.chart" . }}
+{{- with .Values.podAnnotations }}
+      annotations:
+{{- include "eric-enm-common-helmchart-library.product-info" . | indent 8 }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+{{- if index .Values "securityContext" }}
+{{- if .Values.securityContext.enabled }}
+      securityContext:
+        sysctls:
+        - name: "{{ .Values.securityContext.sysctls.name }}"
+          value: "{{ .Values.securityContext.sysctls.value }}"
+{{- end }}
+{{- end }}
+{{- if .Values.priorityClassName }}
+      priorityClassName: "{{ .Values.priorityClassName }}"
+{{- end }}
+{{ include "eric-enm-common-helmchart-library.affinity.tpl" . | indent 6 }}
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}
+{{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+{{- end }}
+{{ include "eric-enm-common-helmchart-library.container.tpl" . | indent 6 }}
+{{- if include "eric-enm-common-helmchart-library.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-enm-common-helmchart-library.pullSecrets" . }}
+{{- end }}
+{{- if .Files.Glob "appconfig/volumes.yaml" }}
+      volumes:
+{{ tpl (.Files.Get "appconfig/volumes.yaml") . | indent 6 }}
+{{- end }}
+{{- end -}}
+{{- define "eric-enm-common-helmchart-library.deployment" -}}
+{{- template "eric-enm-common-helmchart-library.util.merge" (append . "eric-enm-common-helmchart-library.deployment.tpl") -}}
+{{- end -}}

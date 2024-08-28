@@ -1,0 +1,20 @@
+{{- define "eric-enm-common-helmchart-library.configmaps.tpl" -}}
+{{ $root := .}}
+{{- $name := .Values.service.name  -}}
+{{- $instance := .Release.Name  -}}
+{{- $version := printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{ range $path, $bytes :=  .Files.Glob  "appconfig/configmaps/*.yaml" }}
+{{ $name := base ($path) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/instance: {{ $instance }}
+    app.kubernetes.io/version: {{ $version }}
+  name:  {{- template "eric-enm-common-helmchart-library.configmapName" (list $name) -}}
+data:
+{{ tpl ($root.Files.Get $path) $root | indent 2 }}
+---
+{{ end }}
+{{- end -}}

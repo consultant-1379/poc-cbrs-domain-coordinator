@@ -1,0 +1,16 @@
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "eric-ctrl-bro.name" .}}-pdb
+  labels:
+{{ include "eric-ctrl-bro.k8sLabels" . | indent 4 }}
+{{- include "eric-ctrl-bro.prodInfoLabels" . | indent 4}}
+  annotations:
+{{- include "eric-ctrl-bro.prodInfoAnnotations" . | indent 4 }}
+spec:
+  minAvailable: {{ template "eric-ctrl-bro.podDisruptionBudget" . }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "eric-ctrl-bro.name" . }}
+      app.kubernetes.io/instance: {{.Release.Name | quote }}
+    

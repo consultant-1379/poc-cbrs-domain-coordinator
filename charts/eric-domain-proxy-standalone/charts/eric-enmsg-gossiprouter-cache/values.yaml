@@ -1,0 +1,78 @@
+## eric-enmsg-gossiprouter-cache image version
+
+global:
+  registry:
+    url: armdocker.rnd.ericsson.se
+    pullSecret:
+  ingress:
+    enmHost:
+  timezone: UTC
+productInfo:
+  number: CXC 174 1936
+  rstate: R11A
+# Number of replicas(pods) to deploy
+replicas-eric-enmsg-gossiprouter-cache: 1
+images:
+  eric-enmsg-gossiprouter-cache:
+    name: eric-enmsg-gossiprouter-cache
+    tag: 1.10.0-8
+    command: "[ '/entrypoint.sh', '-bind_addr $(POD_IP) -port $(PORT)' ]"
+  eric-enm-monitoring:
+    enabled: true
+    name: eric-enm-monitoring-jre
+    tag: 1.7.0-8
+imageCredentials:
+  repoPath: proj-enm
+  pullPolicy: Always
+  registry:
+    url:
+    pullSecret:
+service:
+  name: gossiprouter-cache
+  annotations: {}
+  labels: {}
+servicePorts:
+  enabled: true
+ingress_jboss_web_context:
+  enabled: false
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+resources:
+  requests:
+    enabled: true
+    memory: 4096Mi
+  limits:
+    enabled: true
+    memory: 4096Mi
+livenessProbe:
+  enabled: false
+  command: /opt/ericsson/vmmonitord/bin/ocf_monitor.py
+  arguments: --exec_agents
+  initialDelaySeconds: 600
+  timeoutSeconds: 15
+  periodSeconds: 30
+  failureThreshold: 1
+readinessProbe:
+  enabled: false
+  command: /opt/ericsson/vmmonitord/bin/ocf_monitor.py
+  arguments: --exec_agents
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 1
+podAnnotations: {}
+tolerations: []
+affinity: {}
+nodeAffinity: {}
+priorityClassName: ""
+nodeSelector: {}
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0
+## Pod Disruption Budget is an indicator of the number of disruptions that can be tolerated at a given time.
+podDisruptionBudget: {}
+monitoring:
+  jmx_service_url: "service:jmx:rmi:///jndi/rmi://:18983/jmxrmi"

@@ -1,0 +1,43 @@
+{{- $global := fromJson (include "eric-cnom-server.global" .) }}
+{{- if and $global.security.tls.enabled (and .Values.alarmHandler.tls.enabled (.Capabilities.APIVersions.Has "siptls.sec.ericsson.com/v1")) }}
+apiVersion: siptls.sec.ericsson.com/v1
+kind: InternalCertificate
+metadata:
+  name: {{ include "eric-cnom-server.fullname" . }}-alarm-handler-client-cert
+  labels:
+    {{- include "eric-cnom-server.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-cnom-server.product-info" . | nindent 4 }}
+    {{- if .Values.annotations }}
+    {{- .Values.annotations | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  kubernetes:
+    ## Mandatory; string.
+    ## The secret where the certificate and key are stored.
+    ## The same secret should not be used for multiple purposes, as SIP-TLS
+    ## overwrites the content periodically.
+    generatedSecretName: {{ include "eric-cnom-server.fullname" . }}-alarm-handler-client-cert
+  certificate:
+    subject:
+      ## Mandatory; string.
+      ## The Subject Common Name (CN) of the certificate.
+      ## This typically corresponds to the domain name of the service or a client identifier.
+      cn: {{ include "eric-cnom-server.fullname" . }}
+    subjectAlternativeName:
+      populateKubernetesDns: false
+    issuer:
+      ## Optional; string.
+      ## The identifier for the Issuer CA. Decides from which CA to request the certificate.
+      ## It must be the same as the InternalUserCA custom resource metadata.name field.
+      ## If left empty, the certificate is issued by SIP-TLS intermediate CA which is part of
+      ## the SIP-TLS trusted root CA chain.
+      reference: {{ .Values.alarmHandler.host }}-ca
+    extendedKeyUsage:
+      ## Mandatory; boolean
+      ## Whether 'TLS Web Client Authentication' is set.
+      tlsClientAuth: true
+      ## Mandatory; boolean
+      ## Whether 'TLS Web Server Authentication' is set.
+      tlsServerAuth: false
+{{- end }}

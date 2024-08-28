@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gp{{ .Values.job.name }}
+  labels:
+    app: {{ .Values.job.name }}
+    heritage: "{{ .Release.Service }}"
+    app.kubernetes.io/name: "{{ .Values.job.name }}"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/version: {{ template "eric-enm-sfwkdb-schemamgt.chart" . }}
+  annotations:
+  {{- include "eric-enm-sfwkdb-schemamgt.product-info" . | indent 4 }}
+data:
+  global.properties: |
+    postgresql01_admin_password={{ .Values.global.enmProperties.postgresql01_admin_password }}

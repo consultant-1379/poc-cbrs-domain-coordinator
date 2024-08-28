@@ -1,0 +1,32 @@
+- name: cmserv-monitoring
+  image: {{ template "eric-enm-monitoring-remotewriter.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "eric-enm-monitoring" "name" }}:{{ index .Values "images" "eric-enm-monitoring" "tag" }}
+  imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+  command: {{ index .Values "images" "eric-enm-monitoring" "command" }}
+
+  env:
+  - name: SERVICENAME
+    value: {{ .Values.service.name }}
+  - name: INSTR_EXPORTER_PORT 
+    value: {{ .Values.monitoring.instr_exporter_port  | quote }}
+  - name: JMX_SERVICE_URL
+    value: {{ .Values.monitoring.jmx_service_url }}
+  - name: JBOSS_USER
+    value: {{ .Values.monitoring.jboss_user }}
+  - name: JBOSS_PASSWORD
+    value: {{ .Values.monitoring.jboss_password }}
+    
+
+#  livenessProbe:
+#    httpGet:
+#      port: 12986
+#    initialDelaySeconds: 120
+#    timeoutSeconds: 15
+#    periodSeconds: 30
+#    failureThreshold: 1
+#  readinessProbe:
+#    httpGet:
+#      port: 12986
+#    initialDelaySeconds: 60
+#    periodSeconds: 30
+#    timeoutSeconds: 15
+#    failureThreshold: 1

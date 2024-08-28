@@ -1,0 +1,13 @@
+modelVersion: 2.0
+
+properties:
+    # Microservice helm chart name
+  - helm-chart-name: poc-cbrs-domain-coordinator
+    # Microservice docker image name
+  - docker-image-name: poc-cbrs-domain-coordinator
+    # Microserver init docker image name
+  - init-docker-image-name: poc-cbrs-domain-coordinator-init
+  # cbos version
+  - image-base-os-version: "3.35.0-11"
+  # ENM Product Set version
+  - enm-product-set-version: "21.15.86"

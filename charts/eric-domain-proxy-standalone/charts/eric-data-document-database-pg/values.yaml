@@ -1,0 +1,380 @@
+#global:
+#  pullSecret:
+#  registry:
+#    url: armdocker.rnd.ericsson.se
+#    pullSecret: # deprecated
+#    imagePullPolicy:
+#  adpBR:
+#    broServiceName: eric-ctrl-bro
+#    broGrpcServicePort: 3000
+#    brLabelKey: adpbrlabelkey
+#  timezone: UTC
+  ## add for DR113
+  #security:
+  #  tls:
+  #    enabled: true
+  ## added for DR-D1123-124
+  #  policyBinding:
+  #    create: true
+  #  policyReferenceMap:
+  #    default-restricted-security-policy: customer-z-restricted
+  #    erole-f003d240cca24da741: customer-z-network
+  #internalIPFamily: IPv6 or IPv4
+  #nodeSelector: {}
+ 
+brAgent:
+  enabled: false
+  logLevel: "info"
+  RootLogLevel: "info"
+  PGAgentLogLevel: "info"
+  ## logicalDBBackupEnable control the behavior of backup and restore.
+  ## if true, PG will take single database backup and restore.
+  ## if false, PG will take whole service DB backup and restore.
+  ##
+  logicalDBBackupEnable: false
+  ## the value of backupTypelist is one list that used to define the scopes of service, and bra use them to register in the BRO.
+  ## current DDB PG only support one DDB instance. Then the backupTypelist only allow set one value or empty string as default scope.
+  ## for example.
+  ## backupTypeList:
+  ##  - "configuration-data"
+  backupTypeList: []
+
+  properties:
+    production_date: 2021-04-09
+  ## By default, brLabelValue is the Chart.Name which is unique
+  brLabelValue:
+  ## For backupTypeList only declares a single value, backup and restore action need more parameters which will
+  ## be defined in the configmap.
+  ## The parameter backupDataModelConfig specify the name of external configmap.
+  ## Notes: the configmap resource must create before BRA deployment.
+  ## For detail, refer the doc Document Database PG Service Deployment Guide.
+  ##
+  #backupDataModelConfig:
+
+## Name used to override the service name
+# nameOverride:
+
+## postgres image repository
+imageCredentials:
+  logshipper:
+    registry:
+      url:
+      pullPolicy:
+    repoPath: proj-bssf/adp-log/release
+  pullSecret:
+
+  repoPath: proj-document-database-pg/data
+  ## Specify a imagePullPolicy
+  ## 'Always' if imageTag is 'latest', else set to 'IfNotPresent'
+  ##
+  #  pullPolicy: IfNotPresent # deprecated
+
+  registry:
+  ## Specify imagePullSecrets
+  ##
+    url:
+    #pullSecret: # deprecated
+    imagePullPolicy:
+images:
+  logshipper:
+    name: "eric-log-shipper"
+    tag: "5.3.0-14"
+  postgres:
+    name: eric-data-document-database-pg
+    tag: 5.5.0-50
+  metrics:
+    name: eric-data-document-database-metrics
+    tag: 5.5.0-50
+  kube-client:
+    name: eric-data-document-database-kube-client
+    tag: 5.5.0-50
+  bra:
+    name: eric-data-document-database-bra
+    tag: 5.5.0-50 
+  brm:
+    name: eric-data-document-database-brm
+    tag: 5.5.0-50 
+
+
+highAvailability:
+  synchronousModeEnabled: true
+  replicaCount: 2
+
+## Create a database
+## Default: the postgres user
+#postgresDatabase:
+
+
+## Postgres user credentials stored as Kubernetes Secrets
+credentials:
+  kubernetesSecretName:
+  keyForUserId: custom-user
+  keyForUserPw: custom-pwd
+  keyForSuperPw: super-pwd
+  keyForMetricsPw: metrics-pwd
+  keyForReplicaId: replica-user
+  keyForReplicaPw: replica-pwd
+
+## Specify initdb arguments, e.g. --data-checksums
+
+postgresInitdbArgs:
+  - auth-host: md5
+  - auth-local: trust
+  - encoding: UTF8
+  - locale: en_US.UTF-8
+  - data-checksums
+
+## Use an alternate scheduler, e.g. "stork".
+##
+# schedulerName:
+
+## Specify runtime config parameters as a dict, using camelCase, e.g.
+## shared_buffers: "500MB"
+## log_connections: "yes"
+## huge_pages: "off"
+#postgresConfig:
+#  shared_buffers: "500MB"
+#  log_connections: "yes"
+#  huge_pages: "off"
+
+postgresLogging:
+  ## Specify if enable postgres logging, true or false
+  enabled: false
+
+#User information for metrics
+#metricsDefPwd:
+
+## Using RollingUpdate, specify the update strategy for statefulset
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    partition: 0
+
+persistentVolumeClaim:
+  enabled: true
+
+  ## database data Persistent Volume Storage Class
+  ## If defined in helm installation, persistentVolumeClaim volume will use defined value as storageClassName to create pvc.
+  ## if not defined, it will use the default storage class on the kubernetes cluster.
+  #storageClassName:
+  size: 8Gi
+
+
+restore:
+    # The path stores the backup data which will be restored
+    backupDataDir: ""
+
+patroni:
+  # default is INFO
+  logLevel: INFO
+  requests_logLevel: INFO
+
+
+
+metrics:
+  enabled: true
+  datasource:
+  logLevel: info
+  service:
+    port: 9187
+    #nodePort:
+  queryMetrics:
+    pg_postmaster:
+      query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
+      metrics:
+        - start_time_seconds:
+            usage: "GAUGE"
+            description: "Time at which postmaster started"
+
+    pg_database:
+      query: " SELECT pg_database.datname, pg_database_size(pg_database.datname) as size FROM pg_database"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of the database"
+        - size:
+            usage: "GAUGE"
+            description: "Disk space used by the database"
+
+
+## Configure resource requests and limits
+##
+resources:
+  logshipper:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
+  postgres:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      cpu: "1"
+      memory: "2560Mi"
+  metrics:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  kube_client:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      cpu: "200m"
+      memory: "512Mi"
+  brm:
+    requests:
+      memory: "256Mi"
+      cpu: "300m"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+  bra:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+      ephemeral-storage: "10Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+      ephemeral-storage: "12Gi"
+service:
+  port: 5432
+  # nodePort:
+## add for DR113
+  endpoints:
+    postgres:
+      tls:
+        enforced: required
+    postgresExporter:
+      tls:
+        enforced: required
+
+probing:
+  liveness:
+    postgres:
+      initialDelaySeconds: 300
+      periodSeconds: 15
+      failureThreshold: 6
+      timeoutSeconds: 15
+    metrics:
+      initialDelaySeconds: 300
+      periodSeconds: 10
+      failureThreshold: 6
+      timeoutSeconds: 15
+    brm:
+      initialDelaySeconds: 30
+      periodSeconds: 5
+      failureThreshold: 6
+      timeoutSeconds: 15
+    bra:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      failureThreshold: 6
+      timeoutSeconds: 15
+  readiness:
+    postgres:
+      initialDelaySeconds: 20
+      periodSeconds: 5
+      timeoutSeconds: 15
+      failureThreshold: 3
+      successThreshold: 1
+    metrics:
+      initialDelaySeconds: 20
+      periodSeconds: 5
+      timeoutSeconds: 15
+      failureThreshold: 3
+      successThreshold: 1
+    brm:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+      failureThreshold: 3
+      successThreshold: 1
+    bra:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+      failureThreshold: 3
+      successThreshold: 1
+hooks:
+  pre_install:
+    activeDeadlineSeconds: 300
+
+nodeSelector:
+  postgres: {}
+  brAgent: {}
+  cleanuphook: {}
+
+## Interface for setting Node labels and tolerations for pod assignment
+tolerations:
+   postgres: []
+   brAgent: []
+   cleanuphook: []
+
+# Note: According to design rule for adp, the following toleration will be added to brAgent and cleanuphook, and the configration for 
+# the these tolerations will be ignored.
+#tolerations: 
+#    - key: node.kubernetes.io/not-ready
+#      operator: Exists
+#      effect: NoExecute
+#      tolerationSeconds: 0
+#    - key: node.kubernetes.io/unreachable
+#      operator: Exists
+#      effect: NoExecute
+#      tolerationSeconds: 0
+
+  
+## affinity.podAntiAffinity , valid value are "soft" or "hard". 
+affinity: 
+  podAntiAffinity: soft
+
+##productinfo
+productinfo:
+  rstate: R6A
+
+## Kubernetes cluster info
+## Note: VERY IMPORTANT, DO NOT CHANGE THE FOLLOWING CONFIGRATION, THEY ARE VERY SENSETIVE INFORMATION ABOUT KUBERNETES CLUSTER
+## IF YOU REALLY WANT TO CHANGE , PLEASE ASK YOUR KUBERNETES ADMINISTRATOR.
+k8sClusterInfo:
+  clusterDomain: cluster.local
+
+
+##### For logshiper, need adaptsion
+livenessProbe:
+  logshipper:
+    initialDelaySeconds: 300
+    timeoutSeconds: 15
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 3
+
+readinessProbe:
+  logshipper:
+    initialDelaySeconds: 30
+    timeoutSeconds: 15
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 3
+
+
+log:
+  # Supported values ["stdout", "stream"]
+  outputs:
+    - stdout
+  logshipper:
+    level: info
+
+logshipper:
+  logplane: "adp-app-logs"
+  logtransformer:
+    host: eric-log-transformer
+
+podDisruptionBudget:
+  minAvailable : 50%

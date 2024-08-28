@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "eric-ctrl-bro.name" . }}
+  annotations:
+{{ include "eric-ctrl-bro.prodInfoAnnotations" . | indent 4 }}
+  labels:
+{{ include "eric-ctrl-bro.k8sLabels" . | indent 4 }}
+{{- include "eric-ctrl-bro.prodInfoLabels" . | indent 4}}
+spec:
+  {{- if .Values.global}}
+  {{- if .Values.global.internalIPFamily }}
+  ipFamilies: [{{ .Values.global.internalIPFamily | quote }}]  # ipFamilies was introduced in K8s v1.20
+  {{- end }}
+  {{- end }}
+  type: ClusterIP
+  ports:
+  {{- if or (eq (include "eric-ctrl-bro.global.tls" .) "false") (eq .Values.service.endpoints.restActions.tls.enforced "optional") }}
+  - name: http
+    port: {{ .Values.bro.restPort }}
+  {{- end }}
+  - name: grpc
+    port: {{template "eric-ctrl-bro.globalBroGrpcServicePort" .}}
+  {{- if eq (include "eric-ctrl-bro.global.tls" .) "true" }}
+  - name: https
+    port: {{ .Values.bro.restTlsPort }}
+  - name: pm-tls
+    port: {{.Values.bro.pmTlsPort}}
+  {{- if eq .Values.bro.enableConfigurationManagement true }}
+  - name: cmm-tls
+    port: {{.Values.bro.cmmNotifTlsPort}}
+  {{- end }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ template "eric-ctrl-bro.name" . }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}

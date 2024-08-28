@@ -1,0 +1,23 @@
+{{- if or .Values.rbac.createServiceAccount (and (not (quote .Values.rbac.createServiceAccount)) .Values.rbac.createClusterRoleBinding) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+{{- include "eric-log-shipper.labels" . | indent 4 }}
+    app: {{ include "eric-log-shipper.name" . | quote }}
+    chart: {{ include "eric-log-shipper.chart" . | quote }}
+    component: {{ .Values.logshipper.name | quote }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ include "eric-log-shipper.name" . }}-{{ .Release.Namespace }}
+  annotations:
+    {{- include "eric-log-shipper.annotations" . | indent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "eric-log-shipper.name" . | quote }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "eric-log-shipper.name" . }}-{{ .Release.Namespace }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

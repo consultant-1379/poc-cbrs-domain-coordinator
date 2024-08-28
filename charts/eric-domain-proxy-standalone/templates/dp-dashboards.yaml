@@ -1,0 +1,149 @@
+{{- if .Values.dpCommon -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dp-dashboards
+data:
+  default.json: |
+    {
+      "$schema": "../../../server/jsonSchemas/dashboardFile.schema.json",
+      "namespace": "dp",
+      "dashboards": [
+        {
+          "_id": "default_dashboard",
+          "title": "Default Dashboard",
+          "apps": ["statusOverview"],
+          "tiles": [
+            {
+              "xSize": 10,
+              "widget": "example_timeline"
+            },
+            {
+              "xSize": 10,
+              "ySize": 2,
+              "widget": "builtin:pod_table"
+            }
+          ]
+        }
+      ],
+      "widgets": [
+        {
+          "_id": "example_timeline",
+          "widgetType": "timeline",
+          "title": "Total CPU",
+          "unit": "cpu seconds/s",
+          "sources": [{ "source": "example_cpu_total" }]
+        }
+      ],
+      "sources": [
+        {
+          "_id": "example_cpu_total",
+          "sourceType": "prometheus",
+          "query": "sum(irate(container_cpu_usage_seconds_total[2m]))",
+          "label": "Total cpu seconds/s"
+        }
+      ]
+    }
+  txexpiry.json: |-
+    {
+      "namespace": "example",
+      "dashboards": [
+        {
+          "_id": "sastx_dashboard",
+          "title": "TransmitExpiry",
+          "apps": ["statusOverview"],
+          "tiles": [
+            {
+              "xSize": 8,
+              "widget": "minsas_timeline"
+            },
+            {
+              "xSize": 8,
+              "widget": "setcell_timeline"
+            }
+          ]
+        }
+      ],
+      "widgets": [
+        {
+          "_id": "minsas_timeline",
+          "widgetType": "timeline",
+          "title": "Minimum TransmitExpiryTime Per Minute",
+          "unit": "ms",
+          "sources": [{ "source": "minsas_source" }]
+        },
+        {
+          "_id": "setcell_timeline",
+          "widgetType": "timeline",
+          "title": "TransmitExpiryTime Set On Cells",
+          "unit": "ms",
+          "sources": [{ "source": "setcell_source" }]
+        }
+      ],
+      "sources": [
+        {
+          "_id": "minsas_source",
+          "sourceType": "prometheus",
+          "query": "jboss_dh_com_dt_ericsson_dt_oss_dt_sas_dt_instrumentation_dt_domain_dh_proxy_dh_service_cl_type_eq_DomainProxyInstrumentation_nm_minTransmitExpiryTimePerMinute",
+          "splitByLabelName": "pod"
+        },
+        {
+          "_id": "setcell_source",
+          "sourceType": "prometheus",
+          "query": "rate(jboss_dh_com_dt_ericsson_dt_oss_dt_sas_dt_instrumentation_dt_domain_dh_proxy_dh_service_cl_type_eq_DomainProxyInstrumentation_nm_valueOfTransmitExpiryTimeSetOnCells[5m])",
+          "splitByLabelName": "pod"
+        }
+      ]
+    }
+  sasperf.json: |-
+    {
+      "namespace": "example",
+      "dashboards": [
+        {
+          "_id": "sasperf_dashboard",
+          "title": "SAS Performance",
+          "apps": ["statusOverview"],
+          "tiles": [
+            {
+              "xSize": 10,
+              "widget": "sasslow_timeline"
+            },
+            {
+              "xSize": 10,
+              "widget": "sastot_timeline"
+            }
+          ]
+        }
+      ],
+      "widgets": [
+        {
+          "_id": "sasslow_timeline",
+          "widgetType": "timeline",
+          "title": "Slowest Heartbeat Response From SAS",
+          "unit": "ms",
+          "sources": [{ "source": "sasslow_source" }]
+        },
+        {
+          "_id": "sastot_timeline",
+          "widgetType": "timeline",
+          "title": "Total Time For Heartbeat Response From SAS",
+          "unit": "ms",
+          "sources": [{ "source": "sastot_source" }]
+        }
+      ],
+      "sources": [
+        {
+          "_id": "sasslow_source",
+          "sourceType": "prometheus",
+          "query": "jboss_dh_com_dt_ericsson_dt_oss_dt_sas_dt_instrumentation_dt_domain_dh_proxy_dh_service_cl_type_eq_DomainProxyInstrumentation_nm_slowestHbResponseTimePerMinute",
+          "splitByLabelName": "pod"
+        },
+        {
+          "_id": "sastot_source",
+          "sourceType": "prometheus",
+          "query": "rate(jboss_dh_com_dt_ericsson_dt_oss_dt_sas_dt_instrumentation_dt_domain_dh_proxy_dh_service_cl_type_eq_DomainProxyInstrumentation_nm_hbResponseTimeFromSas[5m])",
+          "splitByLabelName": "pod"
+        }
+      ]
+    }
+{{- end -}}

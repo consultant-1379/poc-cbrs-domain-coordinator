@@ -1,0 +1,20 @@
+{{- $g := fromJson (include "eric-data-search-engine-curator.global" .) -}}
+{{- if $g.security.policyBinding.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "eric-data-search-engine-curator.fullname" . }}-rb
+  labels:
+    {{- include "eric-data-search-engine-curator.labels" . | indent 4 }}
+  annotations:
+    {{- include "eric-data-search-engine-curator.annotations" . | indent 4 }}
+    ericsson.com/security-policy.capabilities: ""
+    ericsson.com/security-policy.type: "restricted/default"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ index $g.security.policyReferenceMap "default-restricted-security-policy" | quote }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "eric-data-search-engine-curator.fullname" . }}-sa
+{{- end -}}

@@ -1,0 +1,130 @@
+## eric-enm-monitoring-master image version
+global:
+  registry:
+    url: armdocker.rnd.ericsson.se
+    pullSecret:
+  timezone: UTC
+
+  rwx:
+    storageClass:
+    ddcdataSize:
+
+monitoring:
+  autoUpload:
+    enabled: false
+    ddpsite:
+    account:
+    password:
+  envVars:
+    PROMETHEUS_SVC: eric-enm-prometheus
+    POSTGRES_SERVICE: postgres
+    #ELASTICSEARCH_URL: "http://elasticsearch:9200"
+    #ELASTICSEARCH_INDEX_TEMPLATE: "enm_logs-%Y.%m.%d"
+    #FILE_STORE_TIME: 2
+
+# Flag for enm specifics
+enmdeploy: false
+
+productInfo:
+# R-State of the product. R State should match helm chart version (3.1.0 -> R2A)
+# To automate it when packaging the helm chart rstate can be generated
+# and below value replaced with correct R-State
+  rstate: R10A
+  number: CXC 174 2496
+
+images:
+  eric-enm-monitoring-master:
+    name: eric-enm-monitoring-master
+    tag: 1.9.0-28
+
+imageCredentials:
+  repoPath: proj-enm
+  pullPolicy: Always
+  registry:
+    url:
+    pullSecret:
+
+serviceAccount: ddc
+
+common: &COMMON_VALUES
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  restartPolicy: OnFailure
+  volumeMounts:
+    - name: ddcdata
+      mountPath: /var/ericsson/ddc_data
+    - name: product-info-volume
+      mountPath: /etc/app-volume/product-info/
+  volumes:
+    - name: ddcdata
+      persistentVolumeClaim:
+        claimName: ddcdata
+    - name: product-info-volume
+      configMap:
+        name: product-info
+        optional: true
+  secretVolumeMounts:
+    - name: secret-volume
+      mountPath: /etc/secret-volume
+    - name: remote-servers-volume
+      mountPath: /etc/remote-servers-volume
+  secretVolumes:
+    - name: secret-volume
+      secret:
+        secretName: monitoring-upload-secret
+        optional: true
+    - name: remote-servers-volume
+      secret:
+        secretName: remote-servers
+        optional: true
+        defaultMode: 0600
+
+enm: &ENM_VALUES
+  enmVolumeMounts:
+    - name: dumps
+      mountPath: /ericsson/enm/dumps
+  enmVolumes:
+    - name: dumps
+      persistentVolumeClaim:
+        claimName: hcdumps
+jobs:
+  start:
+    name: eric-enm-monitoring-master-start
+    schedule: "0 0 * * *"
+    command: ["/opt/ericsson/ERICddc/bin/ddc"]
+    args:
+      - "DIRECT"
+      - "START"
+    <<: *COMMON_VALUES
+    <<: *ENM_VALUES
+
+  trigger:
+    name:  eric-enm-monitoring-master-trigger
+    schedule: "05,20,35,50 * * * *"
+    command: ["/opt/ericsson/ERICddc/bin/ddc"]
+    args:
+      - "DIRECT"
+      - "TRIGGER"
+    <<: *COMMON_VALUES
+    <<: *ENM_VALUES
+
+  stop:
+    name:  eric-enm-monitoring-master-stop
+    schedule: "59 23 * * *"
+    command: ["/opt/ericsson/ERICddc/bin/ddc"]
+    args:
+      - "DIRECT"
+      - "STOP"
+    <<: *COMMON_VALUES
+    <<: *ENM_VALUES
+
+  delta:
+    name:  eric-enm-monitoring-master-delta
+    schedule: "0 2-22/2 * * *"
+    command: ["/opt/ericsson/ERICddc/bin/ddc"]
+    args:
+      - "DIRECT"
+      - "DELTA"
+    <<: *COMMON_VALUES
+    <<: *ENM_VALUES

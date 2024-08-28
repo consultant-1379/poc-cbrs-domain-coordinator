@@ -1,0 +1,30 @@
+{{- if and .Values.replicaSet.enabled .Values.replicaSet.pdb.enabled }}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ template "eric-cnom-document-database-mg.name" . }}
+    app.kubernetes.io/version: {{ template "eric-cnom-document-database-mg.version" . }}
+    app.kubernetes.io/instance : {{ .Release.Name }}
+    chart: {{ template "eric-cnom-document-database-mg.chart" . }}
+    heritage: {{ .Release.Service }}
+  name: {{ template "eric-cnom-document-database-mg.name" . }}-secondary
+  annotations:
+    {{- include "eric-cnom-document-database-mg.product-info" . | indent 4 }}
+spec:
+  {{- if .Values.replicaSet.pdb.minAvailable }}
+  {{- if .Values.replicaSet.pdb.minAvailable.secondary }}
+  minAvailable: {{ .Values.replicaSet.pdb.minAvailable.secondary }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.replicaSet.pdb.maxUnavailable }}
+  {{- if .Values.replicaSet.pdb.maxUnavailable.secondary }}
+  maxUnavailable: {{ .Values.replicaSet.pdb.maxUnavailable.secondary }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "eric-cnom-document-database-mg.name" . }}
+      app.kubernetes.io/instance : {{ .Release.Name }}
+      component: secondary
+{{- end }}

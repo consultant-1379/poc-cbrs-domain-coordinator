@@ -1,0 +1,27 @@
+{{- if .Values.dpmediationService -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name  }}-lb
+  labels:
+    app: {{ .Values.service.name | quote }}
+{{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname | quote }}
+{{- end }}
+    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ .Values.service.name | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ template "poc-cbrs-domain-coordinator.chart" . }}
+  annotations:
+{{- include "poc-cbrs-domain-coordinator.product-info" . | indent 4 }}
+{{- with .Values.service.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  type: LoadBalancer
+  loadBalancerIP: {{ .Values.service.loadBalancerIP }}
+  ports:
+{{ tpl (.Files.Get "appconfig/servicePorts.yaml") . | indent 4 }}
+  selector:
+    app: {{ .Values.service.name }}
+{{- end -}}

@@ -1,0 +1,145 @@
+# Default values for log.
+# This is a YAML-formatted file.
+
+#global:
+#  registry:
+#    imagePullPolicy: "IfNotPresent"
+#    url: armdocker.rnd.ericsson.se
+#  timezone: "UTC"
+#  nodeSelector: {}
+#  security:
+#    policyBinding:
+#      create: false
+#    policyReferenceMap:
+#      plc-d25a2e10e7bd762518298d62fb4c47: "plc-d25a2e10e7bd762518298d62fb4c47"
+#      plc-eebfaeadbede5d397d46df59cd48e0: "plc-eebfaeadbede5d397d46df59cd48e0"
+#    tls:
+#      enabled: true
+#  pullSecret:
+
+annotations: {}
+
+labels: {}
+
+imageCredentials:
+  repoPath: proj-bssf/adp-log/release
+  registry:
+    imagePullPolicy: # When set this overrides global image pull policy
+    url:
+  pullSecret: # When set this overrides global pull secret
+
+images:
+  logshipper:
+    name: eric-log-shipper
+    tag: 5.3.0-14
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 25%
+
+minReadySeconds: 0
+
+useFullCfg: false
+logLevel: "info"
+
+logshipper:
+  name: eric-log-shipper
+
+  # Set which service to send log data to.
+  # Default: logtransformer
+  # Values:  searchengine
+  #          logtransformer
+  output: logtransformer
+
+  privileged: false
+
+  autodiscover:
+    enabled: false
+    namespace:
+    logplane: "adp-app-logs"
+    json:
+      enabled: true
+      target: "json"
+    hints:
+      enabled: false
+    inclusions:
+    # - field: "kubernetes.annotations.collect"
+    #   value: "true"
+    exclusions:
+    # - field: "kubernetes.annotations.drop"
+    #   value: "true"
+    paths:
+      - /var/lib/docker/containers/${data.kubernetes.container.id}/*-json.log
+      - /var/log/pods/${data.kubernetes.container.id}/*-json.log
+      - /var/log/pods/${data.kubernetes.namespace}_${data.kubernetes.pod.name}_${data.kubernetes.pod.uid}/**/*.log
+    templates:
+      - condition:
+          equals:
+            kubernetes.container.runtime: containerd
+        config:
+          - type: log
+            paths:
+              - /var/log/pods/*_${data.kubernetes.pod.uid}/${data.kubernetes.container.name}/*.log
+    useContainerInput: false
+  cfgData: |
+    paths:
+      - /var/lib/docker/containers/**/*.log
+      - /var/log/pods/**/*.log
+    fields:
+      logplane: "adp-app-logs"
+
+  harvester:
+    closeTimeout: "5m"
+
+searchengine:
+  host: eric-data-search-engine
+  port: 9200
+
+logtransformer:
+  host: eric-log-transformer
+  port: 5045
+
+readinessProbe:
+  initialDelaySeconds: 30
+  timeoutSeconds: 15
+  periodSeconds: 30
+  successThreshold: 1
+  failureThreshold: 3
+
+livenessProbe:
+  initialDelaySeconds: 300
+  timeoutSeconds: 15
+  periodSeconds: 30
+  successThreshold: 1
+  failureThreshold: 3
+
+resources:
+  logshipper:
+    requests:
+      memory: "100Mi"
+      cpu: "100m"
+    limits:
+      memory: "500Mi"
+      cpu: "250m"
+
+additionalVolumes: |
+  - name: docker-containers
+    hostPath:
+      path: /var/lib/docker/containers
+  - name: kubernetes-containers
+    hostPath:
+      path: /var/log/pods
+
+additionalVolumeMounts: |
+  - name: docker-containers
+    mountPath: /var/lib/docker/containers
+    readOnly: true
+  - name: kubernetes-containers
+    mountPath: /var/log/pods
+    readOnly: true
+
+rbac:
+  automountServiceAccountToken: false
+  createClusterRole: false
+  createClusterRoleBinding: false

@@ -1,0 +1,16 @@
+{{- $syslogOutput := fromJson (include "eric-log-transformer.syslog-output-config" .) -}}
+{{- if (and $syslogOutput.enabled $syslogOutput.tls.enabled) }}
+apiVersion: certm.sec.ericsson.com/v1beta1
+kind: ExternalCertificate
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . }}-syslog-output-trusted-cert
+  labels:
+    {{- include "eric-log-transformer.labels" . | indent 4 }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+spec:
+  generated-secret-name: {{ include "eric-log-transformer.fullname" . }}-trusted-external-secret
+  generated-secret-type: opaque
+  trusted-certificates-file-name: trustedcert
+  trusted-certificate-list-name: {{ $syslogOutput.certificates.trustedCertificateListName }}
+{{- end }}

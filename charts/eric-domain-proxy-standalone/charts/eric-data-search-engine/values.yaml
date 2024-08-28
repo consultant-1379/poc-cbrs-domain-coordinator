@@ -1,0 +1,313 @@
+# Default values for eric-data-search-engine.
+# This is a YAML-formatted file.
+
+#global:
+#  registry:
+#    imagePullPolicy: "IfNotPresent"
+#    url: "armdocker.rnd.ericsson.se"
+#  timezone: "UTC"
+#  security:
+#    tls:
+#      enabled: true
+#  nodeSelector: {}
+#  pullSecret:
+#  internalIPFamily:
+
+affinity:
+  podAntiAffinity: "soft"
+
+labels: {}
+
+annotations: {}
+
+autoSetRequiredWorkerNodeSysctl: true
+
+imageCredentials:
+  repoPath: "proj-adp-log-released"
+  registry:
+    imagePullPolicy: # When set this overrides global image pull policy
+    url:
+  pullSecret: # When set this overrides global pull secret
+  logshipper:
+    registry:
+      url:
+      imagePullPolicy:
+    repoPath: "proj-bssf/adp-log/release"
+
+images:
+  searchengine:
+    name: "eric-data-search-engine"
+    tag: "6.1.0-66"
+  bragent:
+    name: "eric-data-search-engine-br-agent"
+    tag: "6.1.0-66"
+  metrics:
+    name: "eric-data-search-engine-pm-metrics"
+    tag: "6.1.0-66"
+  tlsproxy:
+    name: "eric-data-search-engine-tls-proxy"
+    tag: "6.1.0-66"
+  logshipper:
+    name: "eric-log-shipper"
+    tag: "5.2.0-13"
+
+service:
+  name: "eric-data-search-engine"
+  network:
+    protocol:
+      IPv6: false
+  endpoints:
+    internode:
+      tls:
+        verifyClientHostname: false
+    rest:
+      tls:
+        enforced: required
+        verifyClientCertificate: required
+        verifyClientHostname: false
+
+logLevel: "info"
+
+updateStrategy:
+  ingest:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
+  master:
+    type: "RollingUpdate"
+    rollingUpdate:
+      partition: 0
+  data:
+    type: "RollingUpdate"
+    rollingUpdate:
+      partition: 0
+  bragent:
+    type: "RollingUpdate"
+
+replicaCount:
+  ingest: 1
+  master: 3
+  data: 2
+
+nodeSelector:
+  ingest: {}
+  master: {}
+  data: {}
+  bragent: {}
+
+readinessProbe:
+  ingest:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 15
+    successThreshold: 1
+    failureThreshold: 3
+  master:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 15
+    successThreshold: 1
+    failureThreshold: 3
+  data:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 15
+    successThreshold: 1
+    failureThreshold: 3
+  bragent:
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+  metrics:
+    initialDelaySeconds: 5
+    timeoutSeconds: 15
+  logshipper:
+    initialDelaySeconds: 30
+    timeoutSeconds: 15
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 3
+
+livenessProbe:
+  ingest:
+    initialDelaySeconds: 600
+    periodSeconds: 30
+    timeoutSeconds: 15
+    successThreshold: 1
+    failureThreshold: 3
+  master:
+    initialDelaySeconds: 600
+    periodSeconds: 30
+    timeoutSeconds: 15
+    successThreshold: 1
+    failureThreshold: 3
+  data:
+    initialDelaySeconds: 600
+    periodSeconds: 30
+    timeoutSeconds: 15
+    successThreshold: 1
+    failureThreshold: 3
+  bragent:
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+  metrics:
+    initialDelaySeconds: 5
+    timeoutSeconds: 15
+  tlsproxy:
+    initialDelaySeconds: 5
+    timeoutSeconds: 1
+  logshipper:
+    initialDelaySeconds: 300
+    timeoutSeconds: 15
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 3
+
+jvmHeap:
+  ingest: "512m"
+  master: "512m"
+  data: "1024m"
+
+resources:
+  ingest:
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+  master:
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+  data:
+    limits:
+      cpu: "500m"
+      memory: "2Gi"
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+  bragent:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  metrics:
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+    requests:
+      cpu: "25m"
+      memory: "64Mi"
+  tlsproxy:
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+    requests:
+      cpu: "25m"
+      memory: "64Mi"
+  logshipper:
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+
+persistence:
+  data:
+    persistentVolumeClaim:
+      size: "1Gi"
+      storageClassName:
+  backup:
+    persistentVolumeClaim:
+      size: "1Gi"
+      storageClassName:
+  master:
+    persistentVolumeClaim:
+      size: "64Mi"
+      storageClassName:
+
+podDisruptionBudget:
+  data:
+    maxUnavailable: 1
+  ingest:
+    maxUnavailable: 1
+  master:
+    maxUnavailable: 1
+
+master:
+  tcpPort: 9300
+
+ingest:
+  httpPort: 9200
+
+data:
+  tcpPort: 9300
+
+brAgent:
+  enabled: false
+  backupTypeList:
+  backupDataModelConfigMap:
+  orchestrator:
+    host: eric-ctrl-bro
+    grpcPort: 3000
+
+  cleanRestore: false
+
+  backupRepository:
+    type: "fs"
+    s3:
+      secretName:
+      userKey:
+      passKey:
+      endPoint:
+      bucketName:
+
+metrics:
+  enabled: true
+  httpPort: 9114
+
+clusterDomain: "cluster.local"
+
+log:
+  # Supported values ["stdout", "stream"]
+  outputs:
+    - "stdout"
+  logshipper:
+    level: "info"
+
+logshipper:
+  storagePath: "/logs/"
+  storageAllocation: "100Mi"
+  logplane: "adp-app-logs"
+  harvester:
+    closeTimeout: "5m"
+    logData:
+      - subPaths:
+        - "searchengine.log*"
+        logplane:
+        multiline:
+          pattern: '^\['
+          negate: true
+          match: after
+      - subPaths:
+        - "bragent.log*"
+        logplane:
+        multiline:
+          pattern: '^{'
+          negate: true
+          match: after
+      - subPaths:
+        - "metrics.log*"
+        logplane:
+      - subPaths:
+        - "tlsproxy.log*"
+        logplane:
+  logtransformer:
+    host: eric-log-transformer

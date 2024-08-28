@@ -1,0 +1,7 @@
+- name: gp
+  configMap:
+    name: gpsfwkdb-schemamgt
+- name: key
+  configMap:
+    name: keysfwkdb-schemamgt
+    defaultMode: 0644

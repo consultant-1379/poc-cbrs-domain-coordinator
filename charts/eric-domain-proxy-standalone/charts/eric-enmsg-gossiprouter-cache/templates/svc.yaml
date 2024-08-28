@@ -1,0 +1,7 @@
+{{- template "eric-enm-common-helmchart-library.service" (list . "eric-enmsg-gossiproutercache.service") -}}
+{{- define "eric-enmsg-gossiproutercache.service" -}}
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9600"
+{{- end -}}

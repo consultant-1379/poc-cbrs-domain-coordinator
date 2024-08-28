@@ -1,0 +1,33 @@
+{{- if .Values.ingress_jboss_web_context.enabled -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Values.service.name  }}
+  labels:
+    app: {{ .Values.service.name | quote }}
+  {{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname | quote }}
+  {{- end }}
+    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ .Values.service.name | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ template "eric-enmsg-dpmediation.chart" . }}
+  annotations:
+{{- include "eric-enmsg-dpmediation.product-info" . | indent 4 }}
+{{- with .Values.ingress_jboss_web_context.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  - host: {{ template "eric-enmsg-dpmediation.enmHost" . }}
+    http:
+      paths:
+      - path: {{ .Values.ingress.path }}
+        backend:
+          serviceName: {{ .Values.service.name }}
+          servicePort: {{ .Values.ingress.port }}
+{{ tpl (.Files.Get "appconfig/ingress_jboss_web_context.yaml") . | indent 6 }}
+  tls:
+  - hosts:
+    - {{ template "eric-enmsg-dpmediation.enmHost" . }}
+{{- end -}}

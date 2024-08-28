@@ -1,0 +1,2 @@
+global.properties: |
+  postgresql01_admin_password={{ .Values.global.enmProperties.postgresql01_admin_password }}

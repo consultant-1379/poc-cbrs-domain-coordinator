@@ -1,0 +1,26 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ template "eric-pm-server.name" . }}
+  annotations:
+{{- include "eric-pm-server.helm-annotations" . | indent 2 }}
+  labels:
+    app.kubernetes.io/name: {{ template "eric-pm-server.name" . }}
+    app.kubernetes.io/version: {{ template "eric-pm-server.version" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ template "eric-pm-server.name" . }}
+    chart: {{ template "eric-pm-server.chart" . }}
+    component: {{ .Values.server.name | quote }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ template "eric-pm-server.name" . }}
+      component: {{ .Values.server.name | quote }}
+      release: {{ .Release.Name }}
+  ingress:
+    - ports:
+      - port: 9090
+{{- end }}

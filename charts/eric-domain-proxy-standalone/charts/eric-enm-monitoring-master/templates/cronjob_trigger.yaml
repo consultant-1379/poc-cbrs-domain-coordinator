@@ -1,0 +1,88 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ .Values.jobs.trigger.name }}
+  labels:
+{{- include "eric-enm-monitoring-master.labels" . | indent 4 }}
+  annotations:
+{{- include "eric-enm-monitoring-master.product-info" . | indent 4 }}
+spec:
+  concurrencyPolicy: {{ .Values.jobs.trigger.concurrencyPolicy }}
+  failedJobsHistoryLimit: {{ .Values.jobs.trigger.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+      {{- include "eric-enm-monitoring-master.labels" . | indent 12 }}
+          annotations:
+      {{- include "eric-enm-monitoring-master.product-info" . | indent 12 }}
+        spec:
+          {{- if include "eric-enm-monitoring-master.pullSecrets" . }}
+          imagePullSecrets:
+            - name: {{ template "eric-enm-monitoring-master.pullSecrets" . }}
+          {{- end }}
+          containers:
+          - image: {{ template "eric-enm-monitoring-master.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "eric-enm-monitoring-master" "name" }}:{{ index .Values "images" "eric-enm-monitoring-master" "tag" }}
+            imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+            name: {{ .Values.jobs.trigger.name }}
+            env:
+              - name: TZ
+                value: {{ .Values.global.timezone }}
+{{- if .Values.monitoring.envVars }}
+{{- range $key, $value := .Values.monitoring.envVars}}
+              - name: {{ $key }}
+                value: {{ $value }}
+{{- end }}
+{{- end }}
+{{- if .Values.jobs.trigger.command }}
+            command: {{ .Values.jobs.trigger.command }}
+{{- end }}
+{{- with .Values.jobs.trigger.args }}
+            args:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.jobs.trigger.resources }}
+            resources:
+{{ toYaml . | indent 14 }}
+{{- end }}
+{{- with .Values.jobs.trigger.volumeMounts }}
+            volumeMounts:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.jobs.trigger.secretVolumeMounts }}
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- if .Values.enmdeploy }}
+{{- with .Values.jobs.start.enmVolumeMounts }}
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- end }}
+{{- with .Values.jobs.trigger.nodeSelector }}
+          nodeSelector:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.jobs.trigger.affinity }}
+          affinity:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.jobs.trigger.tolerations }}
+          tolerations:
+{{ toYaml . | indent 12 }}
+{{- end }}
+          restartPolicy: {{ .Values.jobs.trigger.restartPolicy }}
+          serviceAccountName: {{ .Values.serviceAccount }}
+{{- with .Values.jobs.trigger.volumes }}
+          volumes:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.jobs.trigger.secretVolumes }}
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- if .Values.enmdeploy }}
+{{- with .Values.jobs.start.enmVolumes }}
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- end }}
+  schedule: {{ .Values.jobs.trigger.schedule | quote }}
+  successfulJobsHistoryLimit: {{ .Values.jobs.trigger.successfulJobsHistoryLimit }}

@@ -1,0 +1,356 @@
+{{- $g := fromJson (include "eric-log-transformer.global" .) -}}
+{{- $d := fromJson (include "eric-log-transformer.deprecated" .) -}}
+{{- $ti := fromJson (include "eric-log-transformer.testInternal" .) -}}
+{{- $syslogOutput := fromJson (include "eric-log-transformer.syslog-output-config" .) -}}
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . | quote }}
+  labels:
+{{- include "eric-log-transformer.labels" . | indent 4 }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    app: {{ include "eric-log-transformer.fullname" . | quote }}
+    chart: {{ include "eric-log-transformer.chart" . | quote }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: {{ .Values.updateStrategy.type | quote }}
+    {{- if eq .Values.updateStrategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+    {{- end }}
+  selector:
+    matchLabels:
+      app: {{ include "eric-log-transformer.fullname" . | quote }}
+  template:
+    metadata:
+      name: {{ include "eric-log-transformer.fullname" . | quote }}
+      labels:
+{{- include "eric-log-transformer.labels" . | indent 8 }}
+        release: {{ .Release.Name }}
+        app: {{ include "eric-log-transformer.fullname" . | quote }}
+        component: log
+        role: indexer
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/log-configmap.yaml") . | sha256sum | quote }}
+        {{- include "eric-log-transformer.annotations" . | indent 8 }}
+        {{- if and (.Values.metrics.enabled) (not $g.security.tls.enabled) }}
+          {{- include "eric-log-transformer.metrics-annotations" . | indent 8 }}
+        {{- end }}
+    spec:
+{{- if .Values.tolerations }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 6 }}
+{{- end }}
+      serviceAccount: ""
+      serviceAccountName: {{ include "eric-log-transformer.fullname" . }}-sa
+      {{- include "eric-log-transformer.pod-anti-affinity" . | indent 6 }}
+      containers:
+      - name: "logtransformer"
+        image: {{ include "eric-log-transformer.image-registry-url" . | quote }}
+        imagePullPolicy: {{ .Values.imageCredentials.registry.imagePullPolicy | default $g.registry.imagePullPolicy | quote }}
+        {{- $redirect := "stdout" }}
+        {{- if has "stream" .Values.log.outputs }}
+          {{- $redirect = "file" }}
+          {{- if has "stdout" .Values.log.outputs }}
+            {{- $redirect = "all" }}
+          {{- end }}
+        {{- end }}
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - /opt/redirect/stdout-redirect -redirect={{ $redirect }} -size=5 -logfile=/logs/logtransformer.log -container=logtransformer -service-id={{ include "eric-log-transformer.fullname" . }} -run="/opt/logstash/init.sh --config.reload.automatic"
+        lifecycle: {{ include "eric-log-transformer.hooks" . | indent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - all
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CONTAINER_NAME
+          value: logtransformer
+        - name: SERVICE_ID
+          value: {{ include "eric-log-transformer.fullname" . }}
+        - name: APP_NAME
+          value: $(NAMESPACE)-log
+        - name: ELASTICSEARCH_HOSTS
+          value: {{ include "eric-log-transformer.elasticsearch-host" . | quote }}
+        - name: LS_JAVA_OPTS
+          value: "-Xms{{ .Values.jvmHeap }} -Xmx{{ .Values.jvmHeap }}"
+        - name: LOGSHIPPER_LEGACY_TLS
+          {{- if not $d.security.tls.eda }}
+          value: {{ $d.security.tls.logshipper.enabled | quote}}
+          {{- else }}
+          value: "false"
+          {{- end }}
+        - name: LOG_LEVEL
+          value: {{ .Values.logLevel | quote | default "ERROR" | upper }}
+        - name: GLOBAL_TLS
+          value: {{ $g.security.tls.enabled | quote }}
+        - name: SYSLOG_OUTPUT_TLS
+          value: {{ (and $syslogOutput.enabled $syslogOutput.tls.enabled) | quote }}
+        - name: LUMBERJACK_OUTPUT
+          value: {{ .Values.egress.lumberjack.enabled | quote }}
+        - name: TZ
+          value: {{ $g.timezone | quote }}
+        {{- range $var, $val := $ti.env }}
+        - name: {{ $var }}
+          value: {{ $val | quote }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /_node
+            port: {{ .Values.service.portApi }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        readinessProbe:
+          exec:
+            command:
+              - /readiness-probe.sh
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        resources:
+          requests:
+            cpu: {{ .Values.resources.logtransformer.requests.cpu | quote }}
+            memory: {{ .Values.resources.logtransformer.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.resources.logtransformer.limits.cpu | quote }}
+            memory: {{ .Values.resources.logtransformer.limits.memory | quote }}
+        ports:
+        {{- if $g.security.tls.enabled }}
+        - containerPort: 5015
+          protocol: TCP
+          name: "tls-syslog-tcp"
+        - containerPort: 5044
+          protocol: TCP
+          name: "tls-filebeat"
+        - containerPort: 5024
+          protocol: "TCP"
+          name: "tls-json-tcp"
+        {{- end }}
+        {{- if or (not $g.security.tls.enabled) (eq .Values.service.endpoints.syslogIn.tls.enforced "optional") }}
+        - containerPort: 5014
+          protocol: TCP
+          name: syslog-tcp
+        - containerPort: 5014
+          protocol: UDP
+          name: syslog-udp
+        {{- end }}
+        {{- if or (not $g.security.tls.enabled) (eq .Values.service.endpoints.jsonIn.tls.enforced "optional") }}
+        - containerPort: 5025
+          protocol: "TCP"
+          name: "json-tcp"
+        {{- end }}
+        {{- if or (or (not $g.security.tls.enabled) (eq .Values.service.endpoints.filebeat.tls.enforced "optional")) (or $d.security.tls.logshipper.enabled $d.security.tls.eda) }}
+        - containerPort: 5045
+          protocol: TCP
+          name: filebeat
+        {{- end }}
+        - containerPort: {{ .Values.service.portApi }}
+          protocol: TCP
+          name: logstash
+{{- if .Values.input }}
+{{- if .Values.input.tcp }}
+{{- if .Values.input.tcp.enable }}
+        - containerPort: 5018
+          protocol: TCP
+          name: "json-tcp-eda"
+{{- end }}
+{{- end }}
+{{- end }}
+        volumeMounts:
+        - name: queue-volume
+          mountPath: /opt/logstash/data
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/logstash.conf"
+          subPath: "logstash.conf"
+          readOnly: true
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/searchengine.conf"
+          subPath: "searchengine.conf"
+          readOnly: true
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/pipelines.yml"
+          subPath: "pipelines.yml"
+          readOnly: true
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/log4j2.properties"
+          subPath: "log4j2.properties"
+          readOnly: true
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/logstash.yml"
+          subPath: "logstash.yml"
+          readOnly: true
+        {{- if .Values.config.adpJson.validation.enabled }}
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/adp/logstash-ruby-scripts/adp-json-validation.rb"
+          subPath: "adp-json-validation.rb"
+          readOnly: true
+        {{- end }}
+        {{- if .Values.config.output }}
+          {{- range .Values.config.output }}
+        - name: {{ include "eric-log-transformer.fullname" $ }}-cfg
+          mountPath: "/opt/logstash/config/{{ .name }}.conf"
+          subPath: "{{ .name }}.conf"
+          readOnly: true
+          {{- end }}
+        {{- end }}
+        {{- if $syslogOutput.enabled }}
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/syslog_output.conf"
+          subPath: "syslog_output.conf"
+          readOnly: true
+        {{- end }}
+        {{- if .Values.egress.lumberjack.enabled }}
+        - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+          mountPath: "/opt/logstash/config/lumberjack_output.conf"
+          subPath: "lumberjack_output.conf"
+          readOnly: true
+        {{- end }}
+        {{- if (and $syslogOutput.enabled $syslogOutput.tls.enabled) }}
+        - name: "syslog-output-asymmetric-cert"
+          mountPath: "/run/secrets/syslogOutput-certs/"
+          readOnly: true
+        - name: "syslog-output-trusted-key"
+          mountPath: "/run/secrets/syslogOutput-cacerts/"
+          readOnly: true
+        {{- end }}
+        {{- if .Values.egress.lumberjack.enabled }}
+        - name: "lumberjack-output-asymmetric-cert"
+          mountPath: "/run/secrets/lumberjackOutput-certs/"
+          readOnly: true
+        {{- end }}
+        {{- if and $d.security.tls.logshipper.enabled (not $d.security.tls.eda) }}
+          {{- include "eric-log-transformer.tls-volumemount" . | indent 8 }}
+        {{- else if $d.security.tls.eda }}
+          {{- include "eric-log-transformer.eda-tls-volumemount" . | indent 8 }}
+        {{- end }}
+        {{- if  $g.security.tls.enabled }}
+        - name: "input-cert"
+          mountPath: "/run/secrets/input-cert"
+          readOnly: true
+        - name: "input-ca-cert"
+          mountPath: "/run/secrets/input-ca-cert"
+          readOnly: true
+        - name: "input-client-cert"
+          mountPath: "/run/secrets/input-client-cert"
+          readOnly: true
+        - name: "filebeat-input-ca-cert"
+          mountPath: "/run/secrets/filebeat-ca-certificates"
+          readOnly: true
+        - name: "syslog-input-cacerts"
+          mountPath: "/run/secrets/syslog-input-ca-certs/"
+          readOnly: true
+        - name: "se-http-client-cert"
+          mountPath: "/run/secrets/se-http-client-cert"
+          readOnly: true
+        - name: "sip-tls-trusted-root-cert"
+          mountPath: "/run/secrets/sip-tls-trusted-root-cert"
+          readOnly: true
+        {{- end }}
+      {{- if has "stream" .Values.log.outputs }}
+        {{- include "eric-log-transformer.logshipper-storage-path" (mergeOverwrite . (fromJson (include "eric-log-transformer.logshipper-context" .))) | indent 8 }}
+      {{- end }}
+      {{- if .Values.metrics.enabled }}
+        {{- include "eric-log-transformer.metrics-container" . | indent 6 }}
+        {{- if $g.security.tls.enabled }}
+          {{- include "eric-log-transformer.tlsproxy-container" . | indent 6 }}
+        {{- end }}
+      {{- end }}
+      {{- if has "stream" .Values.log.outputs }}
+        {{- include "eric-log-transformer.logshipper-container" (mergeOverwrite . (fromJson (include "eric-log-transformer.logshipper-context" .))) | indent 6 }}
+      {{- end }}
+      volumes:
+      - name: queue-volume
+        emptyDir:
+          sizeLimit: {{ include "eric-log-transformer.total-queue-size" . }}
+      {{- if (and $syslogOutput.enabled $syslogOutput.tls.enabled) }}
+      - name: "syslog-output-asymmetric-cert"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-asymmetric-secret
+      - name: "syslog-output-trusted-key"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-trusted-external-secret
+      {{- end }}
+      {{- if .Values.egress.lumberjack.enabled }}
+      - name: "lumberjack-output-asymmetric-cert"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-lumberjack-asymmetric-secret
+      {{- end }}
+      {{- if $g.security.tls.enabled }}
+      - name: "input-cert"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-input-cert
+      - name: "input-ca-cert"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-input-ca-cert
+      - name: "input-client-cert"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-input-client-cert
+      - name: "filebeat-input-ca-cert"
+        secret:
+          secretName: "{{ include "eric-log-transformer.fullname" . }}-filebeat-input-ca-cert"
+      - name: "syslog-input-cacerts"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-syslog-input-ca-cert
+      - name: "se-http-client-cert"
+        secret:
+          secretName: {{ include "eric-log-transformer.fullname" . }}-se-http-client-cert
+      - name: "sip-tls-trusted-root-cert"
+        secret:
+          secretName: "eric-sec-sip-tls-trusted-root-cert"
+      {{- if .Values.metrics.enabled }}
+      - name: "pm-trusted-ca"
+        secret:
+          secretName: "eric-pm-server-ca"
+      - name: "pm-server-cert"
+        secret:
+          secretName: "{{ include "eric-log-transformer.fullname" . }}-pm-server-cert"
+      - name: "tlsproxy-client"
+        secret:
+          secretName: "{{ include "eric-log-transformer.fullname" . }}-tlsproxy-client"
+      {{- end }}
+      {{- end }}
+      {{- if has "stream" .Values.log.outputs }}
+        {{- include "eric-log-transformer.logshipper-volume" (mergeOverwrite . (fromJson (include "eric-log-transformer.logshipper-context" .))) | indent 6 }}
+      {{- end }}
+      {{- if and $d.security.tls.logshipper.enabled (not $d.security.tls.eda) }}
+        {{- include "eric-log-transformer.tls-volume" . | indent 6 }}
+      {{- else if $d.security.tls.eda }}
+        {{- include "eric-log-transformer.eda-tls-volume" . | indent 6 }}
+      {{- end }}
+      - name: {{ include "eric-log-transformer.fullname" . }}-cfg
+        configMap:
+          name: {{ include "eric-log-transformer.fullname" . }}-cfg
+      {{- if .Values.metrics.enabled }}
+      - name: "metrics-exporter-cfg"
+        configMap:
+          name: {{ include "eric-log-transformer.fullname" . }}-metrics-exporter-cfg
+      {{- end }}
+      {{- if (or .Values.nodeSelector $g.nodeSelector) }}
+      nodeSelector: {{- include "eric-log-transformer.nodeSelector" . | nindent 8 }}
+      {{- end }}
+      {{- if (or .Values.imageCredentials.pullSecret $g.pullSecret) }}
+      imagePullSecrets:
+        - name: {{ (or .Values.imageCredentials.pullSecret $g.pullSecret) | quote }}
+      {{- end }}

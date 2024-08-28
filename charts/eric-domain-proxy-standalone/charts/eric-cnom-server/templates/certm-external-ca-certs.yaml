@@ -1,0 +1,18 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: certm.sec.ericsson.com/v1beta1
+kind: ExternalCertificate
+metadata:
+  name: {{ include "eric-cnom-server.fullname" . }}-certm-ca-certificates-secret
+  labels:
+    {{- include "eric-cnom-server.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-cnom-server.product-info" . | nindent 4 }}
+    {{- if .Values.annotations }}
+    {{- .Values.annotations | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  generated-secret-name: {{ include "eric-cnom-server.fullname" . }}-certm-ca-certificates-secret
+  generated-secret-type: opaque
+  trusted-certificates-file-name: trusted-certificates
+  trusted-certificate-list-name: {{ .Values.ingress.certificates.trustedCertificateListName }}
+{{- end }}

@@ -1,0 +1,32 @@
+{{- $g := fromJson (include "eric-log-shipper.global" .) -}}
+{{- if $g.security.policyBinding.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+ {{- if .Values.logshipper.privileged }}
+  name: {{ include "eric-log-shipper.fullname" . }}-privileged-security-policy
+ {{- else }}
+  name: {{ include "eric-log-shipper.fullname" . }}-restricted-security-policy
+ {{- end }}
+  labels:
+    {{- include "eric-log-shipper.labels" . | indent 4 }}
+  annotations:
+    {{- include "eric-log-shipper.annotations" . | indent 4 }}
+    ericsson.com/security-policy.capabilities: ""
+  {{- if .Values.logshipper.privileged }}
+    ericsson.com/security-policy.type: "privileged/custom"
+  {{- else }}
+    ericsson.com/security-policy.type: "restricted/custom"
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+ {{- if .Values.logshipper.privileged }}
+  name: {{ index $g.security.policyReferenceMap "plc-d25a2e10e7bd762518298d62fb4c47" | quote }}
+ {{- else }}
+  name: {{ index $g.security.policyReferenceMap "plc-eebfaeadbede5d397d46df59cd48e0" | quote }}
+ {{- end }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "eric-log-shipper.fullname" . }}
+{{- end -}}

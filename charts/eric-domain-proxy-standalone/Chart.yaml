@@ -1,0 +1,9 @@
+apiVersion: v1
+appVersion: 0.0.1
+description: Domain Proxy Integration Chart
+home: 
+maintainers:
+- email: 
+  name:
+name: eric-domain-proxy-standalone
+version: 1.5.2-2

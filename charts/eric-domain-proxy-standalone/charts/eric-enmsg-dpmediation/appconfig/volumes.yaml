@@ -1,0 +1,7 @@
+- name: gp
+  configMap:
+    name: {{ .Release.Name }}-gpdpmediation
+- name: key
+  configMap:
+    name: {{ .Release.Name }}-keypostgres
+    defaultMode: 0644

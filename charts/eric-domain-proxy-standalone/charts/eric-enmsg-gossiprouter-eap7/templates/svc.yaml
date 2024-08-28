@@ -1,0 +1,23 @@
+{{- if .Values.servicePorts.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  labels:
+    app: {{ .Values.service.name }}
+{{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname }}
+{{- end }}
+    heritage: "{{ .Release.Service }}"
+    app.kubernetes.io/name: "{{ .Values.service.name }}"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/version: {{ template "eric-enmsg-gossiprouter-eap7.chart" . }}
+  annotations:
+{{- include "eric-enmsg-gossiprouter-eap7.product-info" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+{{ .Files.Get "appconfig/servicePorts.txt" | indent 4 }}
+  selector:
+    app: {{ .Values.service.name }}
+{{- end }}

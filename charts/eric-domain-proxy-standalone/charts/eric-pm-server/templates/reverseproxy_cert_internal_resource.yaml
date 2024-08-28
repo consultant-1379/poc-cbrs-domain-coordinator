@@ -1,0 +1,35 @@
+{{- $g := fromJson (include "eric-pm-server.global" .) -}}
+{{- if $g.security.tls.enabled }}
+apiVersion: siptls.sec.ericsson.com/v1alpha1
+kind: InternalCertificate
+metadata:
+  name: {{ template "eric-pm-server.name" . }}-cert
+  annotations:
+{{- include "eric-pm-server.helm-annotations" . | indent 2 }}
+  labels:
+    app.kubernetes.io/name: {{ template "eric-pm-server.name" . }}-cert
+    app.kubernetes.io/version: {{ template "eric-pm-server.version" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ template "eric-pm-server.name" . }}
+    chart: {{ template "eric-pm-server.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+
+spec:
+  kubernetes:
+    generatedSecretName: {{ template "eric-pm-server.name" . }}-cert
+    certificateName: "srvcertbundle.pem"
+    privateKeyName: "srvprivkey.pem"
+  certificate:
+    subject:
+      cn: {{ template "eric-pm-server.name" . }}
+    ## debug options
+    # validity:
+    #   overrideTtl: 180
+    # subjectAlternativeName:
+    #   dns:
+    #     - localhost
+    extendedKeyUsage:
+      tlsClientAuth: false
+      tlsServerAuth: true
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "1.0"
+description: A Helm chart for common templates
+name: eric-enm-common-helmchart-library
+type: library
+version: 1.2.0-17

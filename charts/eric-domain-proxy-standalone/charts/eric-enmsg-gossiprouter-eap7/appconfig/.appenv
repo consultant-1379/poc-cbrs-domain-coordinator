@@ -1,0 +1,7 @@
+NAME=eric-enmsg-gossiprouter-eap7
+SVC=gossiprouter-eap7
+DEP=true
+REQUESTS=true
+REQUESTS_LIST=4096Mi
+LIMITS=true
+LIMITS_LIST=4096Mi

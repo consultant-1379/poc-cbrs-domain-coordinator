@@ -1,0 +1,14 @@
+{{- if .Values.egress.lumberjack.enabled }}
+apiVersion: com.ericsson.sec.certm/v1alpha2
+kind: ExternalCertificate
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . }}-lumberjack-output-asymmetric-cert
+  labels:
+    {{- include "eric-log-transformer.labels" . | indent 4 }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+spec:
+  generated-secret-name: {{ include "eric-log-transformer.fullname" . }}-lumberjack-asymmetric-secret
+  generated-secret-type: tls
+  asymmetric-key-certificate-name: {{ include "eric-log-transformer.lumberjack-output-asymmetric-cert" . | quote }}
+{{- end -}}

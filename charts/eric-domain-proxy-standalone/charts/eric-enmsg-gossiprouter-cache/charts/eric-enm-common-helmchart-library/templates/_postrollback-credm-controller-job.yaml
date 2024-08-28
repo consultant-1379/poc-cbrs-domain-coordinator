@@ -1,0 +1,35 @@
+{{- define "eric-enm-common-helmchart-library.postrollback-credm-controller-job.tpl" -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{.Values.service.name}}-postrollback-credm
+  labels:
+    {{ .Values.service.labels }}
+  annotations:
+    "helm.sh/hook": "post-rollback"
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      containers:
+        - name: {{.Values.service.name}}-post-rollback-credm
+          image: "{{ .Values.global.registry.url }}/{{ .Values.imageCredentials.repoPath }}/{{ .Values.hooks.postInstall.imageName }}:{{ .Values.hooks.postInstall.tag }}"
+          imagePullPolicy: {{.Values.hooks.postInstall.pullPolicy}}
+          command:
+          env:
+            - name: CONTROLLER_NAME
+              value: {{.Values.credmController.name | quote}}
+            - name: CONTROLLER_PORT
+              value: {{.Values.credmController.port | quote}}
+            - name: SERVICENAME
+              value: {{.Values.service.name | quote}}
+            - name: HOOKACTION
+              value: "rollback"
+            - name: HOOKNAME
+              value: "mainservice"
+      restartPolicy: Never
+  backoffLimit: 4
+{{- end -}}

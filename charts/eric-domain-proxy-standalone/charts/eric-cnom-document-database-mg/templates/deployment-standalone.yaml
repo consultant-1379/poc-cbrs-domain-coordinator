@@ -1,0 +1,194 @@
+{{- $global := fromJson (include "eric-cnom-document-database-mg.global" .) -}}
+{{- if not .Values.replicaSet.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "eric-cnom-document-database-mg.name" . }}
+  labels:
+    app.kubernetes.io/name: {{ template "eric-cnom-document-database-mg.name" . }}
+    app.kubernetes.io/version: {{ template "eric-cnom-document-database-mg.version" . }}
+    app.kubernetes.io/instance : {{ .Release.Name }}
+    chart: {{ template "eric-cnom-document-database-mg.chart" . }}
+    heritage: "{{ .Release.Service }}"
+    {{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "eric-cnom-document-database-mg.product-info" . | indent 4 }}
+    {{- with .Values.annotations }}
+    {{- toYaml . | indent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "eric-cnom-document-database-mg.name" . }}
+      app.kubernetes.io/instance : {{ .Release.Name }}
+  strategy:
+    type: {{ .Values.updateStrategy.type }}
+    {{- if (eq "Recreate" .Values.updateStrategy.type) }}
+    rollingUpdate: null
+    {{- else if (eq "RollingUpdate" .Values.updateStrategy.type) }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.updateStrategy.rollingUpdate.maxSurge }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "eric-cnom-document-database-mg.name" . }}
+        app.kubernetes.io/version: {{ template "eric-cnom-document-database-mg.version" . }}
+        app.kubernetes.io/instance : {{ .Release.Name }}
+        chart: {{ template "eric-cnom-document-database-mg.chart" . }}
+      {{- if .Values.podLabels }}
+{{ toYaml .Values.podLabels | indent 8 }}
+      {{- end }}
+      {{- if .Values.podAnnotations }}
+      annotations:
+{{- if .Values.podAnnotations }}
+{{ toYaml .Values.podAnnotations | indent 8 }}
+{{- end }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ template "eric-cnom-document-database-mg.name" . }}
+      {{- if .Values.schedulerName }}
+      schedulerName: "{{ .Values.schedulerName }}"
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      {{- end -}}
+      {{- if (or .Values.nodeSelector $global.nodeSelector) }}
+      nodeSelector: {{- include "eric-cnom-document-database-mg.nodeSelector" . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      {{- end }}
+      {{- if include "eric-cnom-document-database-mg.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-cnom-document-database-mg.pullSecrets" . }}
+      {{- end }}
+      containers:
+      - name: {{ template "eric-cnom-document-database-mg.name" . }}
+        image: {{ template "eric-cnom-document-database-mg.registryUrl" . }}{{ template "eric-cnom-document-database-mg.repoPath" . }}{{ index .Values "images" "mongodb" "name" }}:{{ index .Values "images" "mongodb" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy | quote }}
+        env:
+        - name: TZ
+          value: {{ $global.timezone }}
+        {{- if .Values.usePassword }}
+        {{- if .Values.mongodbUsername }}
+        - name: MONGODB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{- else }}{{ template "eric-cnom-document-database-mg.name" . }}{{- end }}
+              key: mongodb-user
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{- else }}{{ template "eric-cnom-document-database-mg.name" . }}{{- end }}
+              key: mongodb-password
+        - name: MONGODB_DATABASE
+          value: "admin"
+        {{- end }}
+        - name: MONGODB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{- else }}{{ template "eric-cnom-document-database-mg.name" . }}{{- end }}
+              key: mongodb-root-password
+        {{- end }}
+        - name: MONGODB_SYSTEM_LOG_VERBOSITY
+          value: {{ .Values.mongodbSystemLogVerbosity | quote }}
+        - name: MONGODB_DISABLE_SYSTEM_LOG
+          {{- if .Values.mongodbDisableSystemLog }}
+          value: "yes"
+          {{- else }}
+          value: "no"
+          {{- end }}
+        - name: MONGODB_ENABLE_IPV6
+        {{- if .Values.mongodbEnableIPv6 }}
+          value: "yes"
+        {{- else }}
+          value: "no"
+        {{- end }}
+        - name: MONGODB_ENABLE_DIRECTORY_PER_DB
+        {{- if .Values.mongodbDirectoryPerDB }}
+          value: "yes"
+        {{- else }}
+          value: "no"
+        {{- end }}
+        {{- if .Values.mongodbExtraFlags }}
+        - name: MONGODB_EXTRA_FLAGS
+          value: {{ .Values.mongodbExtraFlags | join " " | quote }}
+        {{- end }}
+        ports:
+        - name: mongodb
+          containerPort: 27017
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          tcpSocket:
+            port: mongodb
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          tcpSocket:
+            port: mongodb
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.persistence.mountPath }}
+          subPath: {{ .Values.persistence.subPath }}
+        {{- if  or (.Files.Glob "files/docker-entrypoint-initdb.d/*[sh|js|json]") (.Values.initConfigMap) }}
+        - name: custom-init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        {{- end }}
+        {{- if .Values.configmap }}
+        - name: config
+          mountPath: /opt/ericsson/mongodb/conf/mongodb.conf
+          subPath: mongodb.conf
+        {{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+      volumes:
+      {{- if (.Files.Glob "files/docker-entrypoint-initdb.d/*[sh|js|json]") }}
+      - name: custom-init-scripts
+        configMap:
+          name: {{ template "eric-cnom-document-database-mg.name" . }}-init-scripts
+      {{- end }}
+      {{- if (.Values.initConfigMap) }}
+      - name: custom-init-scripts
+        configMap:
+          name: {{ .Values.initConfigMap.name }}
+      {{- end }}
+      - name: data
+      {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ if .Values.persistence.existingClaim }}{{ .Values.persistence.existingClaim }}{{- else }}{{ template "eric-cnom-document-database-mg.name" . }}{{- end }}
+
+      {{- else }}
+        emptyDir: {}
+      {{- end -}}
+      {{- if .Values.configmap }}
+      - name: config
+        configMap:
+          name: {{ template "eric-cnom-document-database-mg.name" . }}
+      {{- end }}
+ {{- end -}}

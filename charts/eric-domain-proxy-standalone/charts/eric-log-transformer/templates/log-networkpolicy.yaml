@@ -1,0 +1,41 @@
+{{- if .Values.networkPolicy.egress }}
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . }}-cfg
+  labels:
+{{- include "eric-log-transformer.labels" . | indent 4 }}
+    app: {{ include "eric-log-transformer.fullname" . | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "eric-log-transformer.fullname" . | quote }}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow outbound connections
+  {{- range .Values.networkPolicy.egress }}
+  - to:
+    - ipBlock:
+        cidr: {{ .cidr }}
+    ports:
+    {{- range .ports }}
+    - protocol: {{ .protocol }}
+      port: {{ .port }}
+    {{- end }}
+  {{- end }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: eric-data-search-engine
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+{{- end }}

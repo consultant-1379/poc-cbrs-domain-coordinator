@@ -1,0 +1,136 @@
+{{- $g := fromJson (include "eric-log-shipper.global" .) -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "eric-log-shipper.fullname" . | quote }}
+  labels:
+{{- include "eric-log-shipper.labels" . | indent 4 }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    app: {{ include "eric-log-shipper.name" . | quote }}
+    chart: {{ include "eric-log-shipper.chart" . | quote }}
+  annotations:
+    {{- include "eric-log-shipper.annotations" . | indent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "eric-log-shipper.name" . | quote }}
+  updateStrategy:
+{{ .Values.updateStrategy | toYaml | indent 4 }}
+  minReadySeconds: {{ .Values.minReadySeconds }}
+  template:
+    metadata:
+      labels:
+{{- include "eric-log-shipper.labels" . | indent 8 }}
+        release: {{ .Release.Name }}
+        app: {{ include "eric-log-shipper.name" . | quote }}
+        component: filebeat
+        role: logger
+      annotations:
+        {{- include "eric-log-shipper.annotations" . | indent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/filebeat-configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "eric-log-shipper.name" . | quote }}
+      volumes:
+      {{- if $g.security.tls.enabled }}
+      - name: "lt-ca-cert"
+        secret:
+          secretName: "eric-sec-sip-tls-trusted-root-cert"
+      - name: "lt-client-cert"
+        secret:
+          secretName: {{ include "eric-log-shipper.fullname" . }}-lt-client-cert
+      {{- end }}
+{{- if .Values.additionalVolumes }}
+{{ .Values.additionalVolumes  | indent 6 }}
+{{- end }}
+      - name: {{ include "eric-log-shipper.fullname" . }}-cfg
+        configMap:
+          name: {{ include "eric-log-shipper.fullname" . }}-cfg
+          items:
+          - key: filebeat.yml
+            path: filebeat.yml
+      containers:
+      - name: "logshipper"
+        image: {{ template "eric-log-shipper.image-registry-url" . }}
+        imagePullPolicy: {{ .Values.imageCredentials.registry.imagePullPolicy | default $g.registry.imagePullPolicy | quote }}
+        securityContext:
+        {{- if .Values.logshipper.privileged }}
+          privileged: true
+        {{- else }}
+          allowPrivilegeEscalation: false
+          privileged: false
+        {{- end }}
+          readOnlyRootFilesystem: false
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
+          capabilities:
+            drop:
+              - all
+        lifecycle: {{ include "eric-log-shipper.hooks" . | indent 10 }}
+        readinessProbe:
+          exec:
+            command:
+            - filebeat
+            - test
+            - output
+            - --path.config
+            - /etc/filebeat
+            - --path.home
+            - /opt/filebeat
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        livenessProbe:
+          exec:
+            command:
+            - echo
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        resources:
+{{ toYaml .Values.resources.logshipper | indent 10 }}
+        volumeMounts:
+        {{- if $g.security.tls.enabled }}
+        - name: "lt-ca-cert"
+          mountPath: "/run/secrets/ca-certificates/"
+          readOnly: true
+        - name: "lt-client-cert"
+          mountPath: "/run/secrets/certificates/"
+          readOnly: true
+        {{- end }}
+{{- if .Values.additionalVolumeMounts }}
+{{ .Values.additionalVolumeMounts | indent 8 }}
+{{- end }}
+        - name: {{ include "eric-log-shipper.fullname" . }}-cfg
+          mountPath: "/etc/filebeat"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: LOGSTASH_HOSTS
+          value: "{{ .Values.logtransformer.host }}:{{ .Values.logtransformer.port }}"
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: TZ
+          value: {{ $g.timezone | quote }}
+        - name: DAEMON_SET
+          value: "true"
+        - name: TLS_ENABLED
+          value: {{ $g.security.tls.enabled | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.logLevel | quote | default "INFO" | upper }}
+      {{- if (or .Values.nodeSelector $g.nodeSelector) }}
+      nodeSelector: {{- include "eric-log-shipper.nodeSelector" . | nindent 8 }}
+      {{- end }}
+      {{- if (or .Values.imageCredentials.pullSecret $g.pullSecret) }}
+      imagePullSecrets:
+        - name: {{ (or  .Values.imageCredentials.pullSecret $g.pullSecret) | quote }}
+      {{- end }}

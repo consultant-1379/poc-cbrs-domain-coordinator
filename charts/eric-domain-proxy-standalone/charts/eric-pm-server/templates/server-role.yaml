@@ -1,0 +1,27 @@
+{{- if .Values.rbac.appMonitoring.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+{{- include "eric-pm-server.helm-annotations" . | indent 2 }}
+  labels:
+    app.kubernetes.io/name: {{ template "eric-pm-server.name" . }}
+    app.kubernetes.io/version: {{ template "eric-pm-server.version" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ template "eric-pm-server.name" . }}
+    chart: {{ template "eric-pm-server.chart" . }}
+    component: {{ .Values.server.name | quote }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "eric-pm-server.name" . }}
+rules:
+  - apiGroups: [""]
+    resources:
+      - endpoints
+      - pods
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+{{- end }}

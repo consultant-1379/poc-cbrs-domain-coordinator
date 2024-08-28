@@ -1,0 +1,17 @@
+{{- if .Values.configmap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ template "eric-cnom-document-database-mg.name" . }}
+    app.kubernetes.io/version: {{ template "eric-cnom-document-database-mg.version" . }}
+    app.kubernetes.io/instance : {{ .Release.Name }}
+    chart: {{ template "eric-cnom-document-database-mg.chart" . }}
+    heritage: {{ .Release.Service }}
+  name: {{ template "eric-cnom-document-database-mg.name" . }}
+  annotations:
+    {{- include "eric-cnom-document-database-mg.product-info" . | indent 4 }}
+data:
+  mongodb.conf: |-
+{{ toYaml .Values.configmap | indent 4 }}
+{{- end }}

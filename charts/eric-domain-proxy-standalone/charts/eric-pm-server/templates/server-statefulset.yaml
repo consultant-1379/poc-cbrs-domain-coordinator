@@ -1,0 +1,418 @@
+{{- $g := fromJson (include "eric-pm-server.global" .) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+{{- include "eric-pm-server.helm-annotations" . | indent 2 }}
+  labels:
+    app.kubernetes.io/name: {{ template "eric-pm-server.name" . }}
+    app.kubernetes.io/version: {{ template "eric-pm-server.version" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ template "eric-pm-server.name" . }}
+    chart: {{ template "eric-pm-server.chart" . }}
+    component: {{ .Values.server.name | quote }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "eric-pm-server.name" . }}
+spec:
+  replicas: {{ .Values.server.replicaCount }}
+  updateStrategy:
+{{ toYaml .Values.updateStrategy.server | indent 4 }}
+  serviceName: {{ .Values.server.name | quote }}
+  selector:
+    matchLabels:
+      app: {{ template "eric-pm-server.name" . }}
+      component: {{ .Values.server.name | quote }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+{{- include "eric-pm-server.helm-annotations" . | indent 6 }}
+    {{- if .Values.server.podAnnotations }}
+{{ toYaml .Values.server.podAnnotations | indent 8 }}
+    {{- end }}
+      labels:
+        app.kubernetes.io/name: {{ template "eric-pm-server.name" . }}
+        app.kubernetes.io/version: {{ template "eric-pm-server.version" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app: {{ template "eric-pm-server.name" . }}
+        component: {{ .Values.server.name | quote }}
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: {{ template "eric-pm-server.fsGroup.coordinated" . }}
+      serviceAccountName: {{ if .Values.rbac.appMonitoring.enabled }}{{ template "eric-pm-server.name" . }}{{ else }}{{ .Values.server.serviceAccountName | quote }}{{ end }}
+      serviceAccount: ""
+      containers:
+{{- if has "stream" .Values.log.outputs }}
+{{- include "eric-pm-server.logshipper-container" . | indent 8 }}
+{{- end }}
+        - name: eric-pm-server
+          image: "{{ template "eric-pm-server.registry" . }}{{ template "eric-pm-server.repoPath" . }}{{ .Values.images.server.name }}:{{ .Values.images.server.tag }}"
+          imagePullPolicy: {{ .Values.imageCredentials.pullPolicy | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          args:
+          {{- if has "stream" .Values.log.outputs }}
+            - /stdout-redirect
+              -service-id=eric-pm-server
+              -container=eric-pm-server
+              -redirect=all
+              -logfile=/logs/pm-server.log
+              -run="/bin/prometheus
+                    --config.file=/etc/config/prometheus.yml
+                    --storage.tsdb.path={{ .Values.server.persistentVolume.mountPath }}
+                    --web.console.libraries=/usr/share/prometheus/console_libraries
+                    --web.console.templates=/usr/share/prometheus/consoles
+                    --web.enable-lifecycle
+                    {{- if .Values.server.retention }}
+                    --storage.tsdb.retention.time={{ .Values.server.retention }}
+                    {{- end }}
+                    {{- range $key, $value := .Values.server.extraArgs }}
+                    --{{ $key }}={{ $value }}
+                    {{- end }}
+                    {{- if .Values.server.baseURL }}
+                    --web.external-url={{ .Values.server.baseURL }}
+                    {{- end }}"
+          {{- else }}
+            - /bin/prometheus
+              --config.file=/etc/config/prometheus.yml
+              --storage.tsdb.path={{ .Values.server.persistentVolume.mountPath }}
+              --web.console.libraries=/usr/share/prometheus/console_libraries
+              --web.console.templates=/usr/share/prometheus/consoles
+              --web.enable-lifecycle
+              {{- if .Values.server.retention }}
+              --storage.tsdb.retention.time={{ .Values.server.retention }}
+              {{- end }}
+              {{- range $key, $value := .Values.server.extraArgs }}
+              --{{ $key }}={{ $value }}
+              {{- end }}
+              {{- if .Values.server.baseURL }}
+              --web.external-url={{ .Values.server.baseURL }}
+              {{- end }}
+          {{- end }}
+          env:
+            - name: STORAGE_CONNECTIVITY
+              value: {{ .Values.server.persistentVolume.storageConnectivity | quote }}
+            - name: TZ
+              value: {{ $g.timezone | quote }}
+          ports:
+            - containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.server.prefixURL }}/-/ready
+              port: 9090
+            initialDelaySeconds: 30
+            timeoutSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.server.prefixURL }}/-/healthy
+              port: 9090
+            initialDelaySeconds: 30
+            timeoutSeconds: 30
+          resources:
+{{ toYaml .Values.resources.server | indent 12 }}
+          volumeMounts:
+{{- if has "stream" .Values.log.outputs }}
+{{- include "eric-pm-server.logshipper-storage-path" . | indent 12 }}
+{{- end}}
+            - name: config-volume
+              mountPath: /etc/config
+            - name: storage-volume
+              mountPath: {{ .Values.server.persistentVolume.mountPath | quote }}
+              subPath: {{ .Values.server.persistentVolume.subPath | quote }}
+          {{- range .Values.server.extraHostPathMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: {{ .readOnly }}
+          {{- end }}
+          {{- if $g.security.tls.enabled }}
+            - name: pmca
+              mountPath: /run/secrets/pmca
+            - name: clicert
+              mountPath: /run/secrets/clicert
+            - name: pm-int-rw-ca
+              mountPath: /run/secrets/pm-int-rw-ca
+            - name: int-rw-clicert
+              mountPath: /run/secrets/int-rw-clicert
+            - name: cacert
+              mountPath: "/run/secrets/cacert"
+          {{- end }}
+          {{- range $ct := .Values.config.certm_tls }}
+            - name: remote-write-{{ $ct.name }}-ca
+              mountPath: /run/secrets/remwrtca/{{ $ct.name }}
+              readOnly: true
+            - name: remote-write-{{ $ct.name }}-cert
+              mountPath: /run/secrets/remwrtcert/{{ $ct.name }}
+              readOnly: true
+          {{- end }}
+          {{- range .Values.server.extraSecretMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              subPath: {{ .subPath }}
+              readOnly: {{ .readOnly }}
+          {{- end }}
+        {{- if $g.security.tls.enabled }}
+        - name: eric-pm-reverseproxy
+          ports:
+            - containerPort: 9089
+          image: "{{ template "eric-pm-server.registry" . }}{{ template "eric-pm-server.repoPath" . }}{{ .Values.images.reverseProxy.name }}:{{ .Values.images.reverseProxy.tag }}"
+          imagePullPolicy: {{ required "A valid .Values.imageCredentials.imagePullPolicy entry is required!" .Values.imageCredentials.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          args:
+          {{- if has "stream" .Values.log.outputs }}
+            - /stdout-redirect
+              -service-id=eric-pm-server
+              -container=eric-pm-reverseproxy
+              -redirect=all
+              -logfile=/logs/pm-reverseproxy.log
+              -run="/bin/reverseproxy"
+          {{- else }}
+            - /bin/reverseproxy
+          {{- end }}
+          env:
+            - name: PM_TLS_PORT
+              value: "9089"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: SERVER_CERTIFICATE_AUTHORITY
+            {{- if not .Values.service.endpoints.reverseproxy.tls.certificateAuthorityBackwardCompatibility }}
+              value: "/run/secrets/pmqryca/query-cacertbundle.pem"
+            {{- else }}
+              value: "/run/secrets/cacert/cacertbundle.pem"
+            {{- end}}
+            - name: SERVER_CERTIFICATE_DIR
+              value: "/run/secrets/cert"
+            - name: CLIENT_TLS_VERIFICATION
+              value: {{ default "required" .Values.service.endpoints.reverseproxy.tls.verifyClientCertificate | quote }}
+            - name: PM_HOST
+              value: "http://localhost:9090"
+            - name: TZ
+              value: {{ $g.timezone | quote }}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ss --tcp -an | grep "9089" | grep LISTEN
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 15
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ss --tcp -an | grep "9089" | grep LISTEN
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 15
+          resources:
+{{ toYaml .Values.resources.reverseProxy | indent 12 }}
+          volumeMounts:
+            {{- if not .Values.service.endpoints.reverseproxy.tls.certificateAuthorityBackwardCompatibility }}
+            - name: pmqryca
+              mountPath: "/run/secrets/pmqryca"
+            {{- else }}
+            - name: cacert
+              mountPath: "/run/secrets/cacert"
+            {{- end }}
+{{- if has "stream" .Values.log.outputs }}
+{{- include "eric-pm-server.logshipper-storage-path" . | indent 12 }}
+{{- end}}
+            - name: cert
+              mountPath: "/run/secrets/cert"
+        {{- end }}
+        - name: eric-pm-configmap-reload
+          image: "{{ template "eric-pm-server.registry" . }}{{ template "eric-pm-server.repoPath" . }}{{ .Values.images.configmapReload.name }}:{{ .Values.images.configmapReload.tag }}"
+          imagePullPolicy: {{ .Values.imageCredentials.pullPolicy | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          args:
+          {{- if has "stream" .Values.log.outputs }}
+            - /stdout-redirect
+              -service-id=eric-pm-server
+              -container=eric-pm-configmap-reload
+              -redirect=all
+              -logfile=/logs/configmap-reload.log
+              -run="/configmap-reload
+                    --volume-dir=/etc/config
+                    --webhook-url={{ template "eric-pm-server.configmap-reload.webhook" . }}"
+          {{- else }}
+            - /configmap-reload --volume-dir=/etc/config --webhook-url={{ template "eric-pm-server.configmap-reload.webhook" . }}
+          {{- end }}
+          env:
+            - name: TZ
+              value: {{ $g.timezone | quote }}
+          resources:
+{{ toYaml .Values.resources.configmapReload | indent 12 }}
+          volumeMounts:
+{{- if has "stream" .Values.log.outputs }}
+{{- include "eric-pm-server.logshipper-storage-path" . | indent 12 }}
+{{- end }}
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+        - name: eric-pm-exporter
+          image: "{{ template "eric-pm-server.registry" . }}{{ template "eric-pm-server.repoPath" . }}{{ .Values.images.pmExporter.name }}:{{ .Values.images.pmExporter.tag }}"
+          imagePullPolicy: {{ .Values.imageCredentials.pullPolicy | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          args:
+          {{- if has "stream" .Values.log.outputs }}
+            - /stdout-redirect
+              -service-id=eric-pm-server
+              -container=eric-pm-exporter
+              -redirect=all
+              -logfile=/logs/pm-exporter.log
+              -run="/pm-exporter"
+          {{- else }}
+            - /pm-exporter
+          {{- end}}
+          env:
+            - name: TZ
+              value: {{ $g.timezone | quote }}
+          ports:
+            - containerPort: 9087
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9087
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9087
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 15
+          resources:
+{{ toYaml .Values.resources.pmExporter | indent 12 }}
+          volumeMounts:
+{{- if has "stream" .Values.log.outputs }}
+{{- include "eric-pm-server.logshipper-storage-path" . | indent 12 }}
+{{- end }}
+            - name: storage-volume
+              mountPath: "/data"
+      {{- if include "eric-pm-server.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-pm-server.pullSecrets" . }}
+      {{- end }}
+    {{- if (or .Values.nodeSelector $g.nodeSelector) }}
+      nodeSelector: {{- include "eric-pm-server.nodeSelector" . | nindent 8 }}
+    {{- end }}
+    {{- if .Values.server.tolerations }}
+      tolerations:
+{{ toYaml .Values.server.tolerations | indent 8 }}
+    {{- end }}
+    {{- if .Values.server.affinity }}
+      affinity:
+{{ toYaml .Values.server.affinity | indent 8 }}
+    {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.server.terminationGracePeriodSeconds }}
+      volumes:
+{{- if has "stream" .Values.log.outputs }}
+{{- include "eric-pm-server.logshipper-volume" . | indent 8 }}
+{{- end }}
+        - name: config-volume
+          configMap:
+            name: {{ if .Values.server.configMapOverrideName }}{{ .Values.server.configMapOverrideName | quote }}{{- else }}{{ template "eric-pm-server.name" . }}{{- end }}
+      {{- if not .Values.server.persistentVolume.enabled }}
+        - name: storage-volume
+          emptyDir: {}
+      {{- end }}
+      {{- range .Values.server.extraHostPathMounts }}
+        - name: {{ .name }}
+          hostPath:
+            path: {{ .hostPath }}
+      {{- end }}
+      {{- if $g.security.tls.enabled }}
+        - name: pmca
+          secret:
+            secretName: eric-pm-server-ca
+        - name: clicert
+          secret:
+            secretName: {{ template "eric-pm-server.name" . }}-client-cert
+        - name: pm-int-rw-ca
+          secret:
+            secretName: eric-pm-server-int-rw-ca
+        - name: int-rw-clicert
+          secret:
+            secretName: {{ template "eric-pm-server.name" . }}-int-rw-client-cert
+        - name: cacert
+          secret:
+            secretName: eric-sec-sip-tls-trusted-root-cert
+        - name: cert
+          secret:
+            secretName: {{ template "eric-pm-server.name" . }}-cert
+        {{- if not .Values.service.endpoints.reverseproxy.tls.certificateAuthorityBackwardCompatibility }}
+        - name: pmqryca
+          secret:
+            secretName: eric-pm-server-query-ca
+        {{- end }}
+      {{- end }}
+      {{- range $ct := .Values.config.certm_tls }}
+        - name: remote-write-{{ $ct.name }}-ca
+          secret:
+            secretName: {{ template "eric-pm-server.name" $ }}-{{ $ct.name }}-trusted-cert-consumer-secret
+        - name: remote-write-{{ $ct.name }}-cert
+          secret:
+            secretName: {{ template "eric-pm-server.name" $ }}-{{ $ct.name }}-asymmetric-key-cert-consumer-secret
+      {{- end }}
+      {{- range .Values.server.extraSecretMounts }}
+        - name: {{ .name }}
+          secret:
+            defaultMode: {{ .defaultMode }}
+            secretName: {{ .secretName }}
+      {{- end }}
+{{- if .Values.server.persistentVolume.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+  {{- if .Values.server.persistentVolume.annotations }}
+      annotations:
+{{ toYaml .Values.server.persistentVolume.annotations | indent 8 }}
+  {{- end }}
+      name: storage-volume
+    spec:
+  {{- if .Values.server.persistentVolume.storageClass }}
+    {{- if (eq "-" .Values.server.persistentVolume.storageClass) }}
+      storageClassName: ""
+    {{- else }}
+      storageClassName: {{ .Values.server.persistentVolume.storageClass | quote }}
+    {{- end }}
+  {{- end }}
+      accessModes:
+{{ toYaml .Values.server.persistentVolume.accessModes | indent 8 }}
+      resources:
+        requests:
+          storage: {{ .Values.server.persistentVolume.size | quote }}
+{{- end }}

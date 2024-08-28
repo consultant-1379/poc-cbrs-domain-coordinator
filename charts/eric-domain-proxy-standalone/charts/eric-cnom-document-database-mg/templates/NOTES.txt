@@ -1,0 +1,20 @@
+** Please be patient while the chart is being deployed **
+
+MongoDB can be accessed via port {{ .Values.service.port }} on the following DNS name from within your cluster:
+
+    {{ template "eric-cnom-document-database-mg.serviceName" . }}.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}
+
+{{ if .Values.usePassword -}}
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace {{ .Release.Namespace }} {{ template "eric-cnom-document-database-mg.name" . }} -o jsonpath="{.data.mongodb-root-password}" | base64 --decode)
+
+{{- end }}
+{{- if and .Values.mongodbUsername .Values.mongodbPassword }}
+
+To get the password for "{{ .Values.mongodbUsername }}" run:
+
+    export MONGODB_PASSWORD=$(kubectl get secret --namespace {{ .Release.Namespace }} {{ template "eric-cnom-document-database-mg.name" . }} -o jsonpath="{.data.mongodb-password}" | base64 --decode)
+
+{{- end }}

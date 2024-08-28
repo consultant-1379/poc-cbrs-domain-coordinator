@@ -1,0 +1,31 @@
+{{ if or (index .Values "tags" "eric-cnom-server") (index .Values "tags" "eric-adp-common") }}
+{{ if (index .Values "tags" "eric-tm-ingress-controller-cr") }}
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{ default (printf "%s-cnom-httpproxy" (include "eric-domain-proxy-standalone.name" .)) }}
+  labels:
+{{- include "eric-domain-proxy-standalone.labels" . | indent 4 }}
+  annotations:
+{{- include "eric-domain-proxy-standalone.product-info" . | indent 4 }}
+{{ if (index .Values "eric-tm-ingress-controller-cr" "ingressClass") -}}
+{{ printf "kubernetes.io/ingress.class: %s" (index .Values "eric-tm-ingress-controller-cr" "ingressClass") | indent 4 }}
+{{ end -}}
+spec:
+  virtualhost:
+    fqdn: {{ index .Values "eric-cnom-server" "fqdn" }}
+    tls:
+      secretName: {{ index .Values "eric-tm-ingress-controller-cr" "tlsSecret" }}
+      minimumProtocolVersion: {{ index .Values "eric-tm-ingress-controller-cr" "minimumProtocolVersion" | quote }}
+  routes:
+    - conditions:
+      - prefix: /
+      services:
+        - name: eric-cnom-server
+          protocol: tls
+          port: 8585
+          validation:
+            caSecret: eric-sec-sip-tls-trusted-root-cert
+            subjectName: eric-cnom-server
+{{- end }}
+{{- end }}

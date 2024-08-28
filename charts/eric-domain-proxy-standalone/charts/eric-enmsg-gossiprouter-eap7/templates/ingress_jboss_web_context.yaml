@@ -1,0 +1,29 @@
+{{- if .Values.ingress_jboss_web_context.enabled -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Values.service.name }}
+  labels:
+    app: {{ .Values.service.name }}
+{{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname }}
+{{- end }}
+    heritage: "{{ .Release.Service }}"
+    app.kubernetes.io/name: "{{ .Values.service.name }}"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/version: {{ template "eric-enmsg-gossiprouter-eap7.chart" . }}
+  annotations:
+{{- include "eric-enmsg-gossiprouter-eap7.product-info" . | indent 4 }}
+{{- with .Values.ingress_jboss_web_context.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  - host: {{ template "eric-enmsg-gossiprouter-eap7.enmHost" . }}
+    http:
+      paths:
+{{ .Files.Get "appconfig/ingress_jboss_web_context.txt" | indent 6 }}
+  tls:
+  - hosts:
+    - {{ template "eric-enmsg-gossiprouter-eap7.enmHost" . }}
+{{- end }}

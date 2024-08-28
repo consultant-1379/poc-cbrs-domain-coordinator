@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: {{ template "eric-data-document-database-pg.name" . }}
+  labels:
+    app: {{ template "eric-data-document-database-pg.name" . }}
+    cluster-name: {{ template "eric-data-document-database-pg.name" . }}
+    role: "master"
+{{- include "eric-data-document-database-pg_app_kubernetes_io_info" .| nindent 4 }}
+  annotations:
+    ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+    ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+    ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+
+subsets: []

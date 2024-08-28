@@ -1,0 +1,9 @@
+NAME=poc-cbrs-domain-coordinator
+DEP=true
+WAIT=true
+WAIT_LIST=gossiprouter-cache,gossiprouter-remoting,jms01,postgres,sps,secserv
+SVC=dpmediation
+REQUESTS=true
+REQUESTS_LIST=1786Mi
+LIMITS=true
+LIMITS_LIST=4096Mi

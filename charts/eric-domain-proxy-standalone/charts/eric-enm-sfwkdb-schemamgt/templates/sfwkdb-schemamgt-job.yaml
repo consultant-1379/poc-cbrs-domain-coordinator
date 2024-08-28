@@ -1,0 +1,158 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.job.name }}
+  labels:
+    app: {{ .Values.job.name }}
+    heritage: "{{ .Release.Service }}"
+    app.kubernetes.io/name: "{{ .Values.job.name }}"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/version: {{ template "eric-enm-sfwkdb-schemamgt.chart" . }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+{{- include "eric-enm-sfwkdb-schemamgt.product-info" . | indent 4 }}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.job.name }}
+        app.kubernetes.io/name: "{{ .Values.job.name }}"
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
+        app.kubernetes.io/version: {{ template "eric-enm-sfwkdb-schemamgt.chart" . }}
+{{- with .Values.podAnnotations }}
+      annotations:
+{{- include "eric-enm-sfwkdb-schemamgt.product-info" . | indent 8 }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+      restartPolicy: Never
+{{- if .Values.priorityClassName }}
+      priorityClassName: "{{ .Values.priorityClassName }}"
+{{- end }}
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}
+{{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+{{- end }}
+{{- if or .Values.extraInitContainers .Values.images.waitInitContainer.enabled .Values.images.enmInitContainer.enabled }}
+      initContainers:
+{{- if .Values.images.waitInitContainer.enabled }}
+      - name: {{ .Values.job.name }}-wait
+        image: {{ template "eric-enm-sfwkdb-schemamgt.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "waitInitContainer" "name" }}:{{ index .Values "images" "waitInitContainer" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        command: {{ index .Values "images" "waitInitContainer" "command" }}
+{{- if .Values.images.waitInitContainer.env }}
+        env:
+{{ toYaml .Values.images.waitInitContainer.env | indent 10 }}
+{{- end }}
+{{- end }}
+{{- if .Values.images.enmInitContainer.enabled }}
+      - name: {{ .Values.job.name }}-enm
+        image: {{ template "eric-enm-sfwkdb-schemamgt.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "enmInitContainer" "name" }}:{{ index .Values "images" "enmInitContainer" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        command: {{ index .Values "images" "enmInitContainer" "command" }}
+        env:
+{{ toYaml .Values.images.enmInitContainer.env | indent 10 }}
+{{- end }}
+{{- if .Values.extraInitContainers }}
+{{ toYaml .Values.extraInitContainers | indent 6 }}
+{{- end }}
+{{- end }}
+      containers:
+      - name: {{ .Values.job.name }}
+        image: {{ template "eric-enm-sfwkdb-schemamgt.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "eric-enm-sfwkdb-schemamgt" "name" }}:{{ index .Values "images" "eric-enm-sfwkdb-schemamgt" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        env:
+          - name: TZ
+            value: {{ .Values.global.timezone }}
+{{- if .Values.global.enmProperties.postgres_service }}
+          - name: POSTGRES_SERVICE
+            value:  {{ .Values.global.enmProperties.postgres_service }}
+{{- end }}
+{{- if index .Values "images" "eric-enm-sfwkdb-schemamgt" "command" }}
+        command: {{ index .Values "images" "eric-enm-sfwkdb-schemamgt" "command" }}
+{{- end }}
+{{- if  .Values.privileged.enabled }}
+        securityContext:
+          privileged: true
+{{- end }}
+{{- if or .Values.resources.requests.enabled .Values.resources.limits.enabled }}
+        resources:
+{{- if  .Values.resources.requests.enabled }}
+          requests:
+{{- if  .Values.resources.requests.memory }}
+            memory: {{ .Values.resources.requests.memory | quote }}
+{{- end }}
+{{- if  .Values.resources.requests.cpu }}
+            cpu: {{ .Values.resources.requests.cpu | quote }}
+{{- end }}
+{{- end }}
+{{- if  .Values.resources.limits.enabled }}
+          limits:
+{{- if  .Values.resources.limits.memory }}
+            memory: {{ .Values.resources.limits.memory | quote }}
+{{- end }}
+{{- if  .Values.resources.limits.cpu }}
+            cpu: {{ .Values.resources.limits.cpu | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.extraEnv }}
+{{ toYaml .Values.extraEnv | indent 10 }}
+{{- end }}
+{{- if .Values.extraPorts.enabled }}
+        ports:
+{{ .Files.Get "appconfig/containerPorts.txt" | indent 10 }}
+{{- end }}
+{{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            port: {{ .Values.livenessProbe.httpPort }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+{{- end }}
+{{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            port: {{ .Values.readinessProbe.httpPort }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+{{- end }}
+{{- if or .Values.configMaps.enabled .Values.extraVolumeMounts.enabled }}
+        volumeMounts:
+{{- end }}
+{{- if .Values.configMaps.enabled }}
+        - name: configurations
+          mountPath: {{ .Values.configMaps.mountPath }}
+{{- end }}
+{{- if .Values.extraVolumeMounts.enabled }}
+{{ .Files.Get "appconfig/volumeMounts.txt" | indent 8 }}
+{{- end }}
+{{- if .Values.sidecarContainers.enabled }}
+{{ $root := .}}
+{{ range $path, $bytes :=  .Files.Glob  "appconfig/sidecars/*.yaml" }}
+{{ tpl ($root.Files.Get $path) $root | indent 6 }}
+{{ end }}
+{{- end }}
+{{- if include "eric-enm-sfwkdb-schemamgt.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-enm-sfwkdb-schemamgt.pullSecrets" . }}
+{{- end }}
+      volumes:
+{{- if .Values.configMaps.enabled }}
+      - name: configurations
+        configMap:
+          name: {{ .Values.configMaps.name }}
+{{- end }}
+{{- if .Values.extraVolumes.enabled }}
+{{ .Files.Get "appconfig/volumes.txt" | indent 6 }}
+{{- end }}

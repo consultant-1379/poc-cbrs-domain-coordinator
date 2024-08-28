@@ -1,0 +1,333 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name  }}
+  labels:
+    app: {{ .Values.service.name | quote }}
+  {{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname | quote }}
+  {{- end }}
+    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ .Values.service.name | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ template "eric-enmsg-dpmediation.chart" . }}
+  annotations:
+{{- include "eric-enmsg-dpmediation.product-info" . | indent 4 }}
+spec:
+  replicas: {{ template "eric-enmsg-dpmediation.replicas" . }}
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  strategy:
+    type: {{ .Values.updateStrategy.type }}
+{{- if and (eq .Values.updateStrategy.type "RollingUpdate") .Values.updateStrategy.rollingUpdate }}
+    rollingUpdate:
+{{ toYaml .Values.updateStrategy.rollingUpdate | indent 6 }}
+{{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+        app.kubernetes.io/name: "{{ .Values.service.name }}"
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
+        app.kubernetes.io/version: {{ template "eric-enmsg-dpmediation.chart" . }}
+{{- with .Values.podAnnotations }}
+      annotations:
+{{- include "eric-enmsg-dpmediation.product-info" . | indent 8 }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+{{- if index .Values "securityContext" }}
+{{- if .Values.securityContext.enabled }}
+      securityContext:
+        sysctls:
+        - name: "{{ .Values.securityContext.sysctls.name }}"
+          value: "{{ .Values.securityContext.sysctls.value }}"
+{{- end }}
+{{- end }}
+{{- if .Values.priorityClassName }}
+      priorityClassName: "{{ .Values.priorityClassName }}"
+{{- end }}
+{{- if .Values.affinity }}
+      affinity:
+        podAntiAffinity:
+          {{ if eq .Values.affinity "requiredDuringSchedulingIgnoredDuringExecution" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ .Values.service.name }}
+            topologyKey: "kubernetes.io/hostname"
+          {{ else }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - {{ .Values.service.name }}
+                topologyKey: "kubernetes.io/hostname"
+              weight: 1
+          {{ end }}
+{{- end }}
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}
+{{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+{{- end }}
+      initContainers:
+      {{- if index .Values "images" "waitInitContainer" }}
+      {{- if .Values.images.waitInitContainer.enabled }}
+      - name: {{ .Values.service.name }}-wait
+        image: {{ template "eric-enmsg-dpmediation.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "waitInitContainer" "name" }}:{{ index .Values "images" "waitInitContainer" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        command: {{ index .Values "images" "waitInitContainer" "command" }}
+      {{- if .Files.Glob "appconfig/initcontainers/waitInitContainer/env.yaml" }}
+        env:
+      {{ tpl (.Files.Get "appconfig/initcontainers/waitInitContainer/env.yaml") . | indent 4 }}
+      {{- end }}
+      {{- end }}
+      {{- if index .Values "images" "enmInitContainer" }}
+      {{- if .Values.images.enmInitContainer.enabled }}
+      - name: {{ .Values.service.name }}-init
+        image: {{ template "eric-enmsg-dpmediation.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "enmInitContainer" "name" }}:{{ index .Values "images" "enmInitContainer" "tag" }}
+      {{- if index .Values "images" "enmInitContainer" "privileged" }}
+      {{- if .Values.images.enmInitContainer.privileged.enabled }}
+        securityContext:
+          privileged: true
+      {{- end }}
+      {{- end }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        command: {{ index .Values "images" "enmInitContainer" "command" }}
+        env:
+      {{- if .Files.Glob "appconfig/initcontainers/enmInitContainer/env.yaml" }}
+      {{ tpl (.Files.Get "appconfig/initcontainers/enmInitContainer/env.yaml") . | indent 4 }}
+      {{- end }}
+        volumeMounts:
+      {{ tpl (.Files.Get "appconfig/volumeMounts.yaml") . | indent 2 }}
+      {{ tpl (.Files.Get "appconfig/initcontainers/enmInitContainer/volumeMounts.yaml") . | indent 2 }}
+      {{- end }}
+      {{- end }}
+      {{- if index .Values "images" "waitForCertificatesContainer" }}
+      {{- if .Values.images.waitForCertificatesContainer.enabled }}
+      - name: {{ .Values.service.name }}-waitforcerts
+        image: {{ template "eric-enmsg-dpmediation.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "waitForCertificatesContainer" "name" }}:{{ index .Values "images" "waitForCertificatesContainer" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        command: {{ index .Values "images" "waitForCertificatesContainer" "command" }}
+        env:
+      {{- if .Files.Glob "appconfig/initcontainers/waitForCertificatesContainer/env.yaml" }}
+      {{ tpl (.Files.Get "appconfig/initcontainers/waitForCertificatesContainer/env.yaml") . | indent 4 }}
+      {{- end }}
+        volumeMounts:
+      {{ tpl (.Files.Get "appconfig/initcontainers/waitForCertificatesContainer/volumeMounts.yaml") . | indent 2 }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: {{ .Values.service.name }}
+        image: {{ template "eric-enmsg-dpmediation.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" .Chart.Name "name" }}:{{ index .Values "images" .Chart.Name "tag" }}
+      {{- if index .Values "privileged" }}
+        securityContext:
+          privileged: {{ .Values.privileged.enabled }}
+      {{- if index .Values "privileged" "capabilities" }}
+          capabilities:
+      {{ toYaml .Values.privileged.capabilities  | indent 6 }}
+      {{- end }}
+      {{- end }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+      {{- if index .Values "lifecycle" }}
+      {{- if  .Values.lifecycle.handler.enabled }}
+        lifecycle:
+      {{ .Files.Get "appconfig/lifecycle_handler.yaml" | indent 4 }}
+      {{- end }}
+      {{- end }}
+      {{- if index .Values "images" .Chart.Name "command" }}
+        command: {{ index .Values "images" .Chart.Name "command" }}
+      {{- end }}
+      {{- if or .Values.resources.requests.enabled .Values.resources.limits.enabled }}
+        resources:
+      {{- if  .Values.resources.requests.enabled }}
+          requests:
+      {{- if  .Values.resources.requests.memory }}
+            memory: {{ .Values.resources.requests.memory | quote }}
+      {{- end }}
+      {{- if  .Values.resources.requests.cpu }}
+            cpu: {{ .Values.resources.requests.cpu | quote }}
+      {{- end }}
+      {{- end }}
+      {{- if  .Values.resources.limits.enabled }}
+          limits:
+      {{- if  .Values.resources.limits.memory }}
+            memory: {{ .Values.resources.limits.memory | quote }}
+      {{- end }}
+      {{- if  .Values.resources.limits.cpu }}
+            cpu: {{ .Values.resources.limits.cpu | quote }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+        env:
+          - name: TZ
+            value: {{ .Values.global.timezone }}
+      {{- if not .Values.jbossLogging }}
+          - name: JBOSS_LOG_LEVEL
+            value:
+      {{- if .Values.global.enmProperties }} {{ .Values.global.enmProperties.defaultJbossLogLevel  | default "\"\"" }} {{ end }}
+      {{- else if not .Values.jbossLogging.exclude }}
+          - name: JBOSS_LOG_LEVEL
+            value:
+      {{- if .Values.jbossLogging.level }} {{ .Values.jbossLogging.level }} {{ else if .Values.global.enmProperties }} {{ .Values.global.enmProperties.defaultJbossLogLevel |  default "\"\"" }} {{ end }}
+      {{- end }}
+      {{- if .Files.Glob "appconfig/envvars/*.yaml" }}
+      {{ $root := .}}
+      {{ range $path, $bytes :=  .Files.Glob  "appconfig/envvars/*.yaml" }}
+{{ tpl ($root.Files.Get $path) $root | indent 10 }}
+      {{ end }}
+      {{- end }}
+      {{- if .Files.Glob "appconfig/containerPorts.yaml" }}
+        ports:
+{{ tpl (.Files.Get "appconfig/containerPorts.yaml") . | indent 10 }}
+      {{- end }}
+      {{- if index .Values "startupProbe" }}
+      {{- if .Values.startupProbe.enabled }}
+        startupProbe:
+      {{- if .Values.startupProbe.httpPort }}
+          httpGet:
+            port: {{ .Values.startupProbe.httpPort }}
+      {{- if .Values.startupProbe.httpPath }}
+            path: {{ .Values.startupProbe.httpPath }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.startupProbe.command }}
+          exec:
+            command:
+              - {{ .Values.startupProbe.command}}
+              - {{ .Values.startupProbe.arguments }}
+      {{- end }}
+          initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+      {{- if .Values.livenessProbe.httpPort }}
+          httpGet:
+            port: {{ .Values.livenessProbe.httpPort }}
+      {{- if .Values.livenessProbe.httpPath }}
+            path: {{ .Values.livenessProbe.httpPath }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.livenessProbe.command }}
+          exec:
+            command:
+              - {{ .Values.livenessProbe.command}}
+              - {{ .Values.livenessProbe.arguments }}
+      {{- end }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: 2
+      {{- end }}
+      {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+      {{- if .Values.livenessProbe.httpPort }}
+          httpGet:
+            port: {{ .Values.readinessProbe.httpPort }}
+      {{- if .Values.readinessProbe.httpPath }}
+            path: {{ .Values.readinessProbe.httpPath }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.livenessProbe.command }}
+          exec:
+            command:
+              - {{ .Values.readinessProbe.command}}
+              - {{ .Values.readinessProbe.arguments }}
+      {{- end }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: 2
+      {{- end }}
+      {{- if .Files.Glob  "appconfig/volumeMounts.yaml" }}
+        volumeMounts:
+      {{- if index .Values "persistentVolumeClaim" }}
+      {{- if .Values.persistentVolumeClaim.enabled }}
+        - name: pv-{{ template "eric-enmsg-dpmediation.name" . }}
+          mountPath: {{ .Values.persistentVolumeClaim.mountPath }}
+      {{- end }}
+      {{- end }}
+{{ tpl (.Files.Get "appconfig/volumeMounts.yaml") . | indent 8 }}
+      {{- end }}
+      {{- if index .Values "images" "eric-enm-monitoring" }}
+      {{- if index .Values "images" "eric-enm-monitoring" "enabled" }}
+      - name: {{ .Values.service.name }}-monitoring
+        image: {{ template "eric-enmsg-dpmediation.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "eric-enm-monitoring" "name" }}:{{ index .Values "images" "eric-enm-monitoring" "tag" }}
+        imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+        env:
+        - name: SERVICENAME
+          value: {{ .Values.service.name }}
+      {{- if index .Values "service" "sgname" }}
+        - name: SGNAME
+          value: {{ .Values.service.sgname }}
+      {{- end }}
+        - name: TZ
+          value: {{ .Values.global.timezone }}
+      {{- if index .Values "monitoring" }}
+      {{- if index .Values "monitoring" "jmx_service_url"}}
+        - name: JMX_SERVICE_URL
+          value: {{ .Values.monitoring.jmx_service_url }}
+      {{- end }}
+      {{- end }}
+      {{- if index .Values "startupProbe" }}
+      {{- if .Values.startupProbe.enabled }}
+        startupProbe:
+          tcpSocket:
+            port: 9600
+          initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+      {{- end }}
+      {{- end }}
+        livenessProbe:
+          tcpSocket:
+            port: 9600
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: 2
+        {{- if index .Values "resources" "monitoring" }}
+        {{- if  .Values.resources.monitoring.enabled }}
+        resources:
+          requests:
+            memory: {{ .Values.resources.monitoring.requests.memory }}
+            cpu: {{ .Values.resources.monitoring.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.monitoring.limits.memory }}
+            cpu: {{ .Values.resources.monitoring.limits.cpu }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- if .Files.Glob "appconfig/sidecars/*.yaml" }}
+      {{ $root := .}}
+      {{ range $path, $bytes :=  .Files.Glob  "appconfig/sidecars/*.yaml" }}
+      -
+{{ tpl ($root.Files.Get $path) $root | indent 8 }}
+      {{ end }}
+      {{- end }}            
+{{- if include "eric-enmsg-dpmediation.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-enmsg-dpmediation.pullSecrets" . }}
+{{- end }}
+{{- if .Files.Glob "appconfig/volumes.yaml" }}
+      volumes:
+{{ tpl (.Files.Get "appconfig/volumes.yaml") . | indent 6 }}
+{{- end }}

@@ -1,0 +1,27 @@
+{{- $d := fromJson (include "eric-log-transformer.deprecated" .) -}}
+{{- if and $d.security.tls.logshipper.enabled (not $d.security.tls.eda) }}
+# Client CA certificate Resource declaration file for TLS (LT-LS)
+
+apiVersion: com.ericsson.sec.tls/v1alpha1
+kind: CertificateAuthority
+metadata:
+  name: {{ include "eric-log-transformer.fullname" . }}-ca
+  labels:
+{{- include "eric-log-transformer.labels" . | indent 4 }}
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+    app: {{ include "eric-log-transformer.fullname" . | quote }}
+    chart: {{ include "eric-log-transformer.chart" . | quote }}
+  annotations:
+    {{- include "eric-log-transformer.annotations" . | indent 4 }}
+spec:
+
+  ## Mandatory; string
+  ## CA certificate Issuer/Subject CN. E.g. "<service-name> Internal Client CA".
+  common-name: {{ include "eric-log-transformer.fullname" . }}
+
+  ## Mandatory; string
+  ## The Kubernetes Secret where the CA certificate is stored.
+  generated-secret-name: {{ include "eric-log-transformer.fullname" . }}-client-ca
+
+{{- end -}}

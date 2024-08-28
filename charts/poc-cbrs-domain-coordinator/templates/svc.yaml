@@ -1,0 +1,25 @@
+{{- if .Values.dpmediationService -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name  }}
+  labels:
+    app: {{ .Values.service.name | quote }}
+  {{- if index .Values "service" "sgname" }}
+    sgname: {{ .Values.service.sgname | quote }}
+  {{- end }}
+    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ .Values.service.name | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ template "poc-cbrs-domain-coordinator.chart" . }}
+  annotations:
+{{- include "poc-cbrs-domain-coordinator.product-info" . | indent 4 }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9600"
+spec:
+  type: ClusterIP
+  ports:
+{{ tpl (.Files.Get "appconfig/servicePorts.yaml") . | indent 2 }}
+  selector:
+    app: {{ .Values.service.name }}
+{{- end -}}

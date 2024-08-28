@@ -1,0 +1,49 @@
+{{- define "eric-enm-common-helmchart-library.monitoring.tpl" -}}
+- name: {{ .Values.service.name }}-monitoring
+  image: {{ template "eric-enm-common-helmchart-library.registryUrl" . }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "eric-enm-monitoring" "name" }}:{{ index .Values "images" "eric-enm-monitoring" "tag" }}
+  imagePullPolicy: {{ .Values.imageCredentials.pullPolicy }}
+  env:
+  - name: SERVICENAME
+    value: {{ .Values.service.name }}
+{{- if index .Values "service" "sgname" }}
+  - name: SGNAME
+    value: {{ .Values.service.sgname }}
+{{- end }}
+  - name: TZ
+    value: {{ .Values.global.timezone }}
+{{- if index .Values "monitoring" }}
+{{- if index .Values "monitoring" "jmx_service_url"}}
+  - name: JMX_SERVICE_URL
+    value: {{ .Values.monitoring.jmx_service_url }}
+{{- end }}
+{{- end }}
+{{- if index .Values "startupProbe" }}
+{{- if .Values.startupProbe.enabled }}
+  startupProbe:
+    tcpSocket:
+      port: 9600
+    initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+    periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+    timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+    failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+{{- end }}
+{{- end }}
+  livenessProbe:
+    tcpSocket:
+      port: 9600
+    initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+    periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+    timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+    failureThreshold: 2
+  {{- if index .Values "resources" "monitoring" }}
+  {{- if  .Values.resources.monitoring.enabled }}
+  resources:
+    requests:
+      memory: {{ .Values.resources.monitoring.requests.memory }}
+      cpu: {{ .Values.resources.monitoring.requests.cpu }}
+    limits:
+      memory: {{ .Values.resources.monitoring.limits.memory }}
+      cpu: {{ .Values.resources.monitoring.limits.cpu }}
+  {{- end }}
+  {{- end }}
+{{- end -}}

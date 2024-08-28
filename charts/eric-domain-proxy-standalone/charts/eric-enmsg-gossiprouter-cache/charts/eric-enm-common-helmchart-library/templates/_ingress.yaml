@@ -1,0 +1,21 @@
+{{- define "eric-enm-common-helmchart-library.ingress.tpl" -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+{{ include "eric-enm-common-helmchart-library.metadata" . | indent 2 }}
+spec:
+  rules:
+  - host: {{ template "eric-enm-common-helmchart-library.enmHost" . }}
+    http:
+      paths:
+      - path: {{ .Values.ingress.path }}
+        backend:
+          serviceName: {{ .Values.service.name }}
+          servicePort: {{ .Values.ingress.port }}
+  tls:
+  - hosts:
+    - {{ template "eric-enm-common-helmchart-library.enmHost" . }}
+{{- end -}}
+{{- define "eric-enm-common-helmchart-library.ingress" -}}
+{{- template "eric-enm-common-helmchart-library.util.merge" (append . "eric-enm-common-helmchart-library.ingress.tpl") -}}
+{{- end -}}

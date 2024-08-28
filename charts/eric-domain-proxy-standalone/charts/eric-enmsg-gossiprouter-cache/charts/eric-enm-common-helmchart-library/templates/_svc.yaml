@@ -1,0 +1,15 @@
+{{- define "eric-enm-common-helmchart-library.service.tpl" -}}
+apiVersion: v1
+kind: Service
+metadata:
+{{ include "eric-enm-common-helmchart-library.metadata" . | indent 2 }}
+spec:
+  type: ClusterIP
+  ports:
+{{ tpl (.Files.Get "appconfig/servicePorts.yaml") . | indent 4 }}
+  selector:
+    app: {{ .Values.service.name }}
+{{- end }}
+{{- define "eric-enm-common-helmchart-library.service" -}}
+{{- template "eric-enm-common-helmchart-library.util.merge" (append . "eric-enm-common-helmchart-library.service.tpl") -}}
+{{- end -}}

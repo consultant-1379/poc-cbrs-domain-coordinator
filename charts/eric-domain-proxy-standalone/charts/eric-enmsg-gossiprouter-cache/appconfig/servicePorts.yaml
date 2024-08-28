@@ -1,0 +1,6 @@
+- name: caches
+  port: 12002
+  targetPort: 12002
+- name: metrics
+  port: 9600
+  targetPort: 9600

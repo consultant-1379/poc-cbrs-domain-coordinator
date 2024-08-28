@@ -1,0 +1,25 @@
+{{- $global := fromJson (include "eric-cnom-server.global" .) }}
+{{- if and $global.security.tls.enabled (and (not .Values.service.endpoints.api.tls.disableSipTls) (.Capabilities.APIVersions.Has "siptls.sec.ericsson.com/v1")) }}
+apiVersion: siptls.sec.ericsson.com/v1
+kind: InternalCertificate
+metadata:
+  name: {{ include "eric-cnom-server.fullname" . }}-api-cert
+  labels:
+    {{- include "eric-cnom-server.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-cnom-server.product-info" . | nindent 4 }}
+    {{- if .Values.annotations }}
+    {{- .Values.annotations | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  kubernetes:
+    generatedSecretName: {{ include "eric-cnom-server.fullname" . }}-api-cert
+    certificateName: "cert.pem"
+    privateKeyName: "key.pem"
+  certificate:
+    subject:
+      cn: {{ include "eric-cnom-server.fullname" . }}
+    extendedKeyUsage:
+      tlsClientAuth: false
+      tlsServerAuth: true
+{{- end }}

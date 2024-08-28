@@ -1,0 +1,14 @@
+global:
+  #pullSecret: cenm6
+  #registry:
+    #url: registry.ccd-c11a006.athtem.eei.ericsson.se
+    #pullSecret: cenm6
+  timezone: Europe/Dublin
+  persistentVolumeClaim:
+    storageClass: network-block
+  enmProperties:
+    postgresql01_admin_password: U2FsdGVkX19uWU+/kfu7jHGmy9BQdkr1Wz7pcHG56M8=
+    postgres_service: postgres
+    defaultJbossLogLevel: "INFO"
+  rwx:
+    storageClass: nfs-enm6

@@ -1,0 +1,15 @@
+{{- define "eric-domain-proxy-standalone.labels" }}
+app.kubernetes.io/name: {{ template "eric-domain-proxy-standalone.name" . }}
+app.kubernetes.io/version: {{ template "eric-domain-proxy-standalone.version" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app: {{ template "eric-domain-proxy-standalone.name" . }}
+chart: {{ template "eric-domain-proxy-standalone.chart" . }}
+release: "{{ .Release.Name }}"
+heritage: "{{ .Release.Service }}"
+{{- end}}
+
+{{- define "eric-domain-proxy-standalone.product-info" }}
+ericsson.com/product-name: "ADP-GS common package"
+ericsson.com/product-number: "CXD 101 0054/2"
+ericsson.com/product-revision: "R2C"
+{{- end}}

@@ -1,0 +1,113 @@
+{{- if or .Release.IsUpgrade .Release.IsInstall }}
+{{- $globalValue := fromJson (include "eric-data-document-database-pg.global" .) -}}
+{{- $defaultLogshipperValue := fromJson (include "eric-data-document-database-pg.logshipper-default-value" .) -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "eric-data-document-database-pg.name" . }}-hook-cleanup
+  labels:
+    app: {{ template "eric-data-document-database-pg.name" . }}
+    chart: {{ template "eric-data-document-database-pg.chart" . }}
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service }}
+{{- include "eric-data-document-database-pg_app_kubernetes_io_info" .| nindent 4 }}
+  annotations:
+    ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+    ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+    ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+    "helm.sh/hook": pre-install,pre-rollback,pre-upgrade,post-delete
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+    "helm.sh/hook-weight": "-4"
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ template "eric-data-document-database-pg.name" . }}-hook-cleanup
+      annotations:
+        ericsson.com/product-name: {{ template "eric-data-document-database-pg.helm-annotations_product_name" . }}
+        ericsson.com/product-number: {{ template "eric-data-document-database-pg.helm-annotations_product_number" . }}
+        ericsson.com/product-revision: {{ template "eric-data-document-database-pg.helm-annotations_product_revision" . }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "eric-data-document-database-pg.name" . }}-hook
+      {{- if include "eric-data-document-database-pg.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-data-document-database-pg.pullSecrets" . }}
+      {{- end }}
+      
+      {{- if or (not (empty .Values.nodeSelector.cleanuphook)) (not (eq "{}" (include "eric-data-document-database-pg.global.nodeSelector" .))) }}
+      nodeSelector:
+{{- include "eric-data-document-database-pg.nodeSelector.cleanuphook" . | nindent 8 }}
+      {{- end }}
+      tolerations:
+      {{- if .Values.tolerations }}
+{{ include "eric-data-document-database-pg.tolerations.HandleTS.cleanuphook" . | indent 8 }}
+      {{- end }}
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 0
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 0
+      containers:
+        - name: hook-cleanup
+          image: "{{ template "eric-data-document-database-pg.registryUrl" . }}{{ template "eric-data-document-database-pg.repoPath" . }}{{ index .Values "images" "kube-client" "name" }}:{{ index .Values "images" "kube-client" "tag" }}"
+          imagePullPolicy: {{ include "eric-data-document-database-pg.imagePullPolicy" . | quote }}
+          env:
+          - name: STATEFULSET_NAME
+            value: {{ template "eric-data-document-database-pg.name" . }}
+          - name: REPLICA_COUNT
+            value: {{ .Values.highAvailability.replicaCount | quote }}
+          - name: CLUSTER_NAME
+            value: {{ template "eric-data-document-database-pg.name" . }}
+          - name: KUBERNETES_NAMESPACE
+            valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+          - name: TRANSIT_COMPONENT
+            value: {{ template "eric-data-document-database-pg.name" . }}-transit-pvc
+          {{- if and (.Release.IsUpgrade) (has "stream" .Values.log.outputs) }}
+          - name: CONTAINER_NAME
+            value:  {{ template "eric-data-document-database-pg.name" . }}-hook
+          - name: LOG_REDIRECT
+            value: {{ template "eric-data-document-database-pg.logRedirect" . }}
+          - name: LOG_FORMAT
+            value: json
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - "
+              {{ template "eric-data-document-database-pg.stdRedirectCMD" .  }}
+              /usr/bin/python {{ template "eric-data-document-database-pg.hook.scriptPath" . }}/kube_handler.py
+              --cleanup_patroni_configmaps; sleep 3"
+          {{- else }}
+          command:
+            - /usr/bin/python
+          args:
+            - {{ template "eric-data-document-database-pg.hook.scriptPath" . }}/kube_handler.py
+            - "--cleanup_patroni_configmaps"
+            {{- if .Release.IsInstall }}
+            - "--installation"
+            {{- end }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          {{- if and (.Release.IsUpgrade) (has "stream" .Values.log.outputs) }}
+          volumeMounts:
+            {{- include "eric-data-document-database-pg.logshipper-storage-path" . | indent 12 }}
+          {{- end }}
+          resources:
+{{ toYaml .Values.resources.kube_client | indent 12 }}
+      {{- if and (.Release.IsUpgrade) (has "stream" .Values.log.outputs) }}
+      {{- include "eric-data-document-database-pg.logshipper-container-hook" . | indent 8 }}
+      volumes:
+      {{- include "eric-data-document-database-pg.logshipper-volume-hook" . | indent 6 }}
+      {{- end }}
+{{- end -}}

@@ -1,0 +1,21 @@
+{{- $global := fromJson (include "eric-cnom-server.global" .) }}
+{{- if $global.security.policyBinding.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "eric-cnom-server.fullname" . }}-security-policy
+  labels:
+    {{- include "eric-cnom-server.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-cnom-server.product-info" . | nindent 4 }}
+    {{- if .Values.annotations }}
+    {{- .Values.annotations | toYaml | nindent 4 }}
+    {{- end }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "eric-cnom-server.fullname" . }}
+roleRef:
+  kind: ClusterRole
+  name: {{ index $global "security" "policyReferenceMap" "default-restricted-security-policy" }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end -}}
